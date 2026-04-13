@@ -116,6 +116,46 @@ export default function Home() {
         </div>
       </section>
 
+      <section className="mx-auto w-full max-w-6xl px-4 pb-8 sm:px-6">
+        <div className="saas-card p-6 sm:p-8">
+          <div className="mb-6 flex items-center justify-between">
+            <div>
+              <p className="text-xs font-medium text-muted-foreground">Pricing</p>
+              <h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
+                Choose a plan that fits your posting goals
+              </h2>
+            </div>
+            <p className="text-xs text-muted-foreground">Simple monthly billing</p>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            <div className="rounded-2xl border bg-background p-5">
+              <p className="text-sm font-semibold">Free</p>
+              <p className="mt-1 text-2xl font-semibold">₹0</p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                5 generations per day. Great for trying WorktoWords.
+              </p>
+            </div>
+
+            <div className="rounded-2xl border bg-background p-5">
+              <p className="text-sm font-semibold">Pro</p>
+              <p className="mt-1 text-2xl font-semibold">₹149/month</p>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Pay via UPI (GPay, PhonePe, Paytm). Up to 100 generations per day.
+              </p>
+              <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                <a
+                  href="/dashboard"
+                  className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
+                >
+                  Upgrade to Pro
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section className="mx-auto w-full max-w-6xl px-4 pb-16 sm:px-6 sm:pb-24">
         <div className="saas-card saas-card-hover overflow-hidden p-6 sm:p-8">
           <div className="flex flex-col items-start justify-between gap-6 md:flex-row md:items-center">

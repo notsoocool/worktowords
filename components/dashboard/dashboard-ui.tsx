@@ -33,6 +33,86 @@ type HistoryPost = {
   created_at: string;
 };
 
+type UsageStatus = {
+  dailyUsage: number;
+  limitPerDay: number;
+  remaining: number;
+  plan: "free" | "pro";
+  lastUsedDate: string;
+  planExpiry: string | null;
+};
+
+type RazorpayOrderPayload = {
+  orderId: string;
+  amount: number;
+  currency: string;
+  keyId: string;
+  plan: "pro";
+  monthlyPriceInr: number;
+  prefill?: {
+    name?: string;
+    email?: string;
+  };
+};
+
+type RazorpaySuccessPayload = {
+  razorpay_payment_id: string;
+  razorpay_order_id: string;
+  razorpay_signature: string;
+};
+
+type RazorpayCheckoutInstance = {
+  open: () => void;
+  on?: (event: string, cb: (payload: unknown) => void) => void;
+};
+
+type RazorpayCheckoutConstructor = new (options: {
+  key: string;
+  amount: number;
+  currency: string;
+  name: string;
+  description: string;
+  order_id: string;
+  handler: (response: RazorpaySuccessPayload) => void;
+  prefill?: { name?: string; email?: string };
+  method?: {
+    upi?: boolean;
+    card?: boolean;
+    netbanking?: boolean;
+    wallet?: boolean;
+    emi?: boolean;
+    paylater?: boolean;
+  };
+  config?: {
+    display?: {
+      blocks?: Record<string, unknown>;
+      sequence?: string[];
+      preferences?: Record<string, unknown>;
+    };
+  };
+  modal?: { ondismiss?: () => void };
+  theme?: { color?: string };
+}) => RazorpayCheckoutInstance;
+
+function getRazorpayConstructor() {
+  return (window as Window & { Razorpay?: RazorpayCheckoutConstructor }).Razorpay;
+}
+
+async function ensureRazorpayLoaded() {
+  if (getRazorpayConstructor()) return true;
+
+  await new Promise<void>((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Failed to load Razorpay SDK."));
+    document.body.appendChild(script);
+  }).catch(() => null);
+
+  return Boolean(getRazorpayConstructor());
+}
+
 function buildLiveToastSteps({
   input,
   mode,
@@ -63,16 +143,16 @@ function buildLiveToastSteps({
         : "Adding deeper insight to build authority…";
 
   return [
-    `Reading what you worked on: "${preview}${preview.length >= 70 ? "…" : ""}"`,
+    `Skimming your notes: "${preview}${preview.length >= 70 ? "…" : ""}"`,
     uniqueWords.length > 0
-      ? `Pulling key points: ${uniqueWords.join(", ")}`
-      : "Finding your strongest takeaway…",
+      ? `Picking out the main bits (${uniqueWords.join(", ")})…`
+      : "Finding the most interesting takeaway…",
     modeStep,
     goalStep,
     uniqueWords.length > 0
-      ? "Structuring your post with hook, story, and CTA…"
-      : "Structuring your post so it is easy to read…",
-    "Almost done - polishing your final draft…",
+      ? "Laying it out so it’s easy to skim…"
+      : "Tidying the structure and flow…",
+    "Almost done — giving it a final polish…",
   ];
 }
 
@@ -83,6 +163,7 @@ export function DashboardUi() {
   const [defaultGoal, setDefaultGoal] = React.useState<Goal>("growth");
   const [tone, setTone] = React.useState<Tone>("professional");
   const [isGenerating, setIsGenerating] = React.useState(false);
+  const [limitReachedOpen, setLimitReachedOpen] = React.useState(false);
   const [isRegenerating, setIsRegenerating] = React.useState<string | null>(
     null
   );
@@ -91,6 +172,32 @@ export function DashboardUi() {
   const [history, setHistory] = React.useState<HistoryPost[]>([]);
   const [historyLoading, setHistoryLoading] = React.useState(false);
   const [settingsSaving, setSettingsSaving] = React.useState(false);
+  const [usage, setUsage] = React.useState<UsageStatus | null>(null);
+  const [isUpgrading, setIsUpgrading] = React.useState(false);
+
+  const fetchUsage = React.useCallback(async () => {
+    try {
+      const res = await fetch("/api/usage", { method: "GET" });
+      const data = (await res.json().catch(() => null)) as
+        | UsageStatus
+        | { error?: string }
+        | null;
+      if (!res.ok) throw new Error((data && "error" in data && data.error) || "Failed to load usage.");
+
+      if (
+        data &&
+        typeof data === "object" &&
+        "remaining" in data &&
+        typeof data.remaining === "number"
+      ) {
+        setUsage(data as UsageStatus);
+      } else {
+        setUsage(null);
+      }
+    } catch {
+      setUsage(null);
+    }
+  }, []);
 
   const fetchSettings = React.useCallback(async () => {
     try {
@@ -155,7 +262,8 @@ export function DashboardUi() {
   React.useEffect(() => {
     void fetchSettings();
     void fetchHistory();
-  }, [fetchHistory, fetchSettings]);
+    void fetchUsage();
+  }, [fetchHistory, fetchSettings, fetchUsage]);
 
   async function callGenerate({
     userInput,
@@ -197,10 +305,21 @@ export function DashboardUi() {
 
       const data = (await res.json().catch(() => null)) as
         | GenerateResponse
-        | { error?: string; raw?: string }
+        | { error?: string; message?: string; raw?: string }
         | null;
 
       if (!res.ok) {
+        if (
+          data &&
+          typeof data === "object" &&
+          "error" in data &&
+          data.error === "LIMIT_REACHED"
+        ) {
+          setLimitReachedOpen(true);
+          void fetchUsage();
+          toast.error("Daily limit reached.", { id });
+          return;
+        }
         const msg =
           (data && "error" in data && typeof data.error === "string" && data.error) ||
           "Failed to generate. Please try again.";
@@ -221,6 +340,7 @@ export function DashboardUi() {
       setResult(next);
       setDraft(next.post);
       void fetchHistory();
+      void fetchUsage();
       toast.success("Post generated.", { id });
     } catch (e) {
       const message =
@@ -244,7 +364,7 @@ export function DashboardUi() {
       toast.info("Generate a post first.");
       return;
     }
-    if (isGenerating || isRegenerating) return;
+    if (isGenerating || isRegenerating || limitReachedOpen) return;
 
     setIsRegenerating(instruction);
     try {
@@ -299,8 +419,171 @@ export function DashboardUi() {
     void saveSettings(defaultGoal, value);
   }
 
+  async function onUpgradeToPro() {
+    if (isUpgrading) return;
+    if (usage?.plan === "pro") {
+      toast.success("You are already on Pro.");
+      return;
+    }
+
+    setIsUpgrading(true);
+    const loadingId = toast.loading("Opening Razorpay checkout…");
+
+    try {
+      const orderRes = await fetch("/api/razorpay/create-order", { method: "POST" });
+      const orderData = (await orderRes.json().catch(() => null)) as
+        | RazorpayOrderPayload
+        | { error?: string }
+        | null;
+
+      if (!orderRes.ok || !orderData || !("orderId" in orderData)) {
+        throw new Error(
+          (orderData && "error" in orderData && orderData.error) ||
+            "Could not start checkout."
+        );
+      }
+
+      const loaded = await ensureRazorpayLoaded();
+      if (!loaded) throw new Error("Razorpay checkout could not be loaded.");
+
+      const RazorpayCheckout = getRazorpayConstructor();
+      if (!RazorpayCheckout) throw new Error("Razorpay is unavailable.");
+
+      toast.message("Pay via UPI (GPay, PhonePe, Paytm)", {
+        id: loadingId,
+      });
+
+      const checkout = new RazorpayCheckout({
+        key: orderData.keyId,
+        amount: orderData.amount,
+        currency: orderData.currency,
+        name: "WorktoWords",
+        description: "Pro Plan - INR 149/month",
+        order_id: orderData.orderId,
+        prefill: {
+          name: orderData.prefill?.name ?? "",
+          email: orderData.prefill?.email ?? "",
+        },
+        method: {
+          upi: true,
+          card: false,
+          netbanking: false,
+          wallet: false,
+          emi: false,
+          paylater: false,
+        },
+        config: {
+          display: {
+            blocks: {
+              upi: {
+                name: "Pay via UPI (GPay, PhonePe, Paytm)",
+                instruments: [{ method: "upi" }],
+              },
+            },
+            sequence: ["block.upi"],
+            preferences: { show_default_blocks: true },
+          },
+        },
+        handler: async (payment) => {
+          try {
+            const verifyRes = await fetch("/api/razorpay/verify", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payment),
+            });
+            const verifyData = (await verifyRes.json().catch(() => null)) as
+              | { ok?: boolean; error?: string }
+              | null;
+
+            if (!verifyRes.ok || !verifyData?.ok) {
+              throw new Error(
+                verifyData?.error || "Payment succeeded but verification failed."
+              );
+            }
+
+            toast.success("Payment successful. Pro is now active for 30 days.", {
+              id: loadingId,
+            });
+            setLimitReachedOpen(false);
+            void fetchUsage();
+          } catch (error) {
+            const msg =
+              error instanceof Error
+                ? error.message
+                : "Payment verification failed.";
+            toast.error(msg, { id: loadingId });
+          } finally {
+            setIsUpgrading(false);
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            setIsUpgrading(false);
+            toast.info("Checkout closed.", { id: loadingId });
+          },
+        },
+        theme: { color: "#111827" },
+      });
+
+      checkout.on?.("payment.failed", () => {
+        setIsUpgrading(false);
+        toast.error("Payment failed. Please try again.", { id: loadingId });
+      });
+
+      checkout.open();
+    } catch (error) {
+      const msg =
+        error instanceof Error ? error.message : "Could not start checkout.";
+      toast.error(msg, { id: loadingId });
+      setIsUpgrading(false);
+    }
+  }
+
   return (
     <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-10 sm:px-6 lg:py-12">
+      {limitReachedOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div
+            className="absolute inset-0 bg-background/60 backdrop-blur"
+            onClick={() => setLimitReachedOpen(false)}
+          />
+          <div className="saas-card relative w-full max-w-md p-6 sm:p-8">
+            <h2 className="text-lg font-semibold tracking-tight">
+              Daily Limit Reached
+            </h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {usage?.plan === "pro"
+                ? "You’ve hit today’s generation limit."
+                : `You’ve used your ${usage?.limitPerDay ?? 5} free posts for today.`}
+            </p>
+            {usage?.plan !== "pro" ? (
+              <p className="mt-2 text-xs text-muted-foreground">
+                Pay via UPI (GPay, PhonePe, Paytm)
+              </p>
+            ) : null}
+            <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+              <Button
+                className="h-11 rounded-xl"
+                onClick={onUpgradeToPro}
+                disabled={isUpgrading || usage?.plan === "pro"}
+              >
+                {usage?.plan === "pro"
+                  ? "Pro Activated"
+                  : isUpgrading
+                    ? "Opening checkout…"
+                    : "Upgrade to Pro"}
+              </Button>
+              <Button
+                variant="outline"
+                className="h-11 rounded-xl"
+                onClick={() => setLimitReachedOpen(false)}
+              >
+                Come back tomorrow
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="saas-card p-6 sm:p-8">
         <div className="flex flex-col gap-6">
           <div className="grid gap-2">
@@ -353,13 +636,23 @@ export function DashboardUi() {
           </div>
 
           <div className="flex justify-end">
-            <Button
-              onClick={onGenerate}
-              disabled={isGenerating}
-              className="h-11 rounded-xl px-6 transition-transform hover:-translate-y-0.5"
-            >
-              {isGenerating ? "Generating…" : "Generate Post"}
-            </Button>
+            <div className="flex flex-col items-end gap-2">
+              {usage ? (
+                <p className="text-xs text-muted-foreground">
+                  <span className="font-medium text-foreground">
+                    {usage.remaining}
+                  </span>{" "}
+                  left today
+                </p>
+              ) : null}
+              <Button
+                onClick={onGenerate}
+                disabled={isGenerating || limitReachedOpen}
+                className="h-11 rounded-xl px-6 transition-transform hover:-translate-y-0.5"
+              >
+                {isGenerating ? "Generating…" : "Generate Post"}
+              </Button>
+            </div>
           </div>
         </div>
       </div>

@@ -76,6 +76,17 @@ export async function POST(req: Request) {
     );
   }
 
+  const supabase = createSupabaseServerClient();
+  if (!supabase) {
+    return Response.json(
+      {
+        error:
+          "Missing Supabase configuration (NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY or SUPABASE_SERVICE_ROLE_KEY).",
+      },
+      { status: 500 }
+    );
+  }
+
   const rawBody = await req.json().catch(() => null);
   const body = rawBody as Partial<GenerateBody> | null;
 
@@ -89,14 +100,27 @@ export async function POST(req: Request) {
     );
   }
 
-  const supabase = createSupabaseServerClient();
-  if (!supabase) {
+  // Daily usage limits (atomic check + increment).
+  const { data: usageRows, error: usageError } = await supabase.rpc(
+    "check_and_increment_usage",
+    { p_user_id: userId }
+  );
+
+  if (usageError) {
+    return Response.json(
+      { error: `Usage limit check failed: ${usageError.message}` },
+      { status: 500 }
+    );
+  }
+
+  const usage = Array.isArray(usageRows) ? usageRows[0] : usageRows;
+  if (usage && usage.allowed === false) {
     return Response.json(
       {
-        error:
-          "Missing Supabase configuration (NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY or SUPABASE_SERVICE_ROLE_KEY).",
+        error: "LIMIT_REACHED",
+        message: "You've reached your free daily limit.",
       },
-      { status: 500 }
+      { status: 429 }
     );
   }
 
