@@ -111,10 +111,55 @@ begin
 end;
 $$;
 
-grant usage on schema public to anon, authenticated;
-grant select, insert on table public.posts to anon, authenticated;
-grant select, insert, update on table public.user_settings to anon, authenticated;
-grant select, insert, update on table public.user_usage to anon, authenticated;
-grant select, insert, update on table public.user_subscriptions to anon, authenticated;
-grant execute on function public.check_and_increment_usage(text) to anon, authenticated;
+-- Security hardening for production:
+-- 1) Keep table/function access server-only through service_role.
+-- 2) Enable RLS as defense-in-depth for any future non-service-role access.
+revoke all on table public.posts from anon, authenticated;
+revoke all on table public.user_settings from anon, authenticated;
+revoke all on table public.user_usage from anon, authenticated;
+revoke all on table public.user_subscriptions from anon, authenticated;
+revoke execute on function public.check_and_increment_usage(text) from anon, authenticated;
+
+grant usage on schema public to service_role;
+grant usage, select on all sequences in schema public to service_role;
+grant select, insert on table public.posts to service_role;
+grant select, insert, update on table public.user_settings to service_role;
+grant select, insert, update on table public.user_usage to service_role;
+grant select, insert, update on table public.user_subscriptions to service_role;
+grant execute on function public.check_and_increment_usage(text) to service_role;
+
+alter table public.posts enable row level security;
+alter table public.user_settings enable row level security;
+alter table public.user_usage enable row level security;
+alter table public.user_subscriptions enable row level security;
+
+drop policy if exists posts_owner_rw on public.posts;
+create policy posts_owner_rw
+  on public.posts
+  for all
+  using (user_id = auth.uid()::text)
+  with check (user_id = auth.uid()::text);
+
+drop policy if exists user_settings_owner_rw on public.user_settings;
+create policy user_settings_owner_rw
+  on public.user_settings
+  for all
+  using (user_id = auth.uid()::text)
+  with check (user_id = auth.uid()::text);
+
+drop policy if exists user_usage_owner_rw on public.user_usage;
+create policy user_usage_owner_rw
+  on public.user_usage
+  for all
+  using (user_id = auth.uid()::text)
+  with check (user_id = auth.uid()::text);
+
+drop policy if exists user_subscriptions_owner_rw on public.user_subscriptions;
+create policy user_subscriptions_owner_rw
+  on public.user_subscriptions
+  for all
+  using (user_id = auth.uid()::text)
+  with check (user_id = auth.uid()::text);
+
+alter function public.check_and_increment_usage(text) set search_path = public, pg_temp;
 

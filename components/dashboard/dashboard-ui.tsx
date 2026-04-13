@@ -18,6 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { toFriendlyBillingError } from "@/lib/billing-errors";
 
 type Mode = "help" | "auto";
 type Goal = "job" | "growth" | "authority";
@@ -403,10 +404,7 @@ export function DashboardUi() {
             setLimitReachedOpen(false);
             void fetchUsage();
           } catch (error) {
-            const msg =
-              error instanceof Error
-                ? error.message
-                : "Payment verification failed.";
+            const msg = toFriendlyBillingError(error);
             toast.error(msg, { id: loadingId });
           } finally {
             setIsUpgrading(false);
@@ -428,8 +426,7 @@ export function DashboardUi() {
 
       checkout.open();
     } catch (error) {
-      const msg =
-        error instanceof Error ? error.message : "Could not start checkout.";
+      const msg = toFriendlyBillingError(error);
       toast.error(msg, { id: loadingId });
       setIsUpgrading(false);
     }

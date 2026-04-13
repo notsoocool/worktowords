@@ -9,6 +9,7 @@ import {
   PRICING_CARD_BUTTON_CLASS,
   PRICING_CARD_BUTTON_INTERACTIVE_CLASS,
 } from "@/lib/pricing-card-button";
+import { toFriendlyBillingError } from "@/lib/billing-errors";
 import { cn } from "@/lib/utils";
 
 type RazorpayOrderPayload = {
@@ -143,10 +144,7 @@ export function UpgradeToProCta({ plan, usageLoading }: UpgradeToProCtaProps) {
               id: loadingId,
             });
           } catch (error) {
-            const msg =
-              error instanceof Error
-                ? error.message
-                : "Payment verification failed.";
+            const msg = toFriendlyBillingError(error);
             toast.error(msg, { id: loadingId });
           } finally {
             setIsUpgrading(false);
@@ -168,8 +166,7 @@ export function UpgradeToProCta({ plan, usageLoading }: UpgradeToProCtaProps) {
 
       checkout.open();
     } catch (error) {
-      const msg =
-        error instanceof Error ? error.message : "Could not start checkout.";
+      const msg = toFriendlyBillingError(error);
       toast.error(msg, { id: loadingId });
       setIsUpgrading(false);
     }

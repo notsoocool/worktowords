@@ -1,5 +1,7 @@
 import OpenAI from "openai";
 import { auth } from "@clerk/nextjs/server";
+import { consumeRateLimit } from "@/lib/rate-limit";
+import { clientIpFrom, logSecurityInfo, logSecurityWarn, requestIdFrom } from "@/lib/security";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 
 type GenerateBody = {
@@ -15,6 +17,10 @@ type GenerateResult = {
   bestTime: string;
   suggestions: string[];
 };
+
+const MAX_USER_INPUT_CHARS = 4000;
+const GENERATE_LIMIT = 12;
+const GENERATE_WINDOW_MS = 60_000;
 
 function isNonEmptyString(v: unknown): v is string {
   return typeof v === "string" && v.trim().length > 0;
@@ -63,16 +69,45 @@ function normalizeResult(obj: unknown): GenerateResult | null {
 }
 
 export async function POST(req: Request) {
+  const requestId = requestIdFrom(req);
   const { userId } = await auth();
   if (!userId) {
-    return Response.json({ error: "Unauthorized" }, { status: 401 });
+    return Response.json(
+      { error: "Unauthorized" },
+      { status: 401, headers: { "x-request-id": requestId } }
+    );
+  }
+  const ip = clientIpFrom(req);
+  const ctx = { requestId, route: "/api/generate", userId, ip };
+
+  const limit = consumeRateLimit(
+    `generate:${userId}:${ip}`,
+    GENERATE_LIMIT,
+    GENERATE_WINDOW_MS
+  );
+  if (!limit.allowed) {
+    logSecurityWarn("rate_limit_exceeded", ctx, {
+      bucket: "generate",
+      limit: limit.limit,
+      windowMs: GENERATE_WINDOW_MS,
+    });
+    return Response.json(
+      { error: "Too many requests. Please try again shortly." },
+      {
+        status: 429,
+        headers: {
+          "Retry-After": String(limit.retryAfterSeconds),
+          "x-request-id": requestId,
+        },
+      }
+    );
   }
 
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     return Response.json(
       { error: "Missing OPENAI_API_KEY" },
-      { status: 500 }
+      { status: 500, headers: { "x-request-id": requestId } }
     );
   }
 
@@ -81,9 +116,9 @@ export async function POST(req: Request) {
     return Response.json(
       {
         error:
-          "Missing Supabase configuration (NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY or SUPABASE_SERVICE_ROLE_KEY).",
+          "Missing Supabase configuration (NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY).",
       },
-      { status: 500 }
+      { status: 500, headers: { "x-request-id": requestId } }
     );
   }
 
@@ -96,7 +131,13 @@ export async function POST(req: Request) {
         error:
           "Invalid body. Expected { userInput: string, mode: 'help'|'write', goal: 'job'|'growth'|'authority' }",
       },
-      { status: 400 }
+      { status: 400, headers: { "x-request-id": requestId } }
+    );
+  }
+  if (body.userInput.trim().length > MAX_USER_INPUT_CHARS) {
+    return Response.json(
+      { error: `Input too long. Maximum ${MAX_USER_INPUT_CHARS} characters.` },
+      { status: 413, headers: { "x-request-id": requestId } }
     );
   }
 
@@ -109,7 +150,7 @@ export async function POST(req: Request) {
   if (usageError) {
     return Response.json(
       { error: `Usage limit check failed: ${usageError.message}` },
-      { status: 500 }
+      { status: 500, headers: { "x-request-id": requestId } }
     );
   }
 
@@ -120,7 +161,7 @@ export async function POST(req: Request) {
         error: "LIMIT_REACHED",
         message: "You've reached your free daily limit.",
       },
-      { status: 429 }
+      { status: 429, headers: { "x-request-id": requestId } }
     );
   }
 
@@ -205,15 +246,24 @@ export async function POST(req: Request) {
 
   const client = new OpenAI({ apiKey });
 
-  const completion = await client.chat.completions.create({
-    model: "gpt-4o-mini",
-    temperature: 0.7,
-    response_format: { type: "json_object" },
-    messages: [
-      { role: "system", content: systemPrompt },
-      { role: "user", content: userPrompt },
-    ],
-  });
+  let completion;
+  try {
+    completion = await client.chat.completions.create({
+      model: "gpt-4o-mini",
+      temperature: 0.7,
+      response_format: { type: "json_object" },
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+    });
+  } catch {
+    logSecurityWarn("provider_error", ctx, { provider: "openai" });
+    return Response.json(
+      { error: "Generation provider failed. Please try again." },
+      { status: 502, headers: { "x-request-id": requestId } }
+    );
+  }
 
   const content = completion.choices[0]?.message?.content ?? "";
   const parsed = safeJsonParse(content);
@@ -223,9 +273,8 @@ export async function POST(req: Request) {
     return Response.json(
       {
         error: "Model returned invalid JSON output.",
-        raw: content,
       },
-      { status: 502 }
+      { status: 502, headers: { "x-request-id": requestId } }
     );
   }
 
@@ -237,12 +286,17 @@ export async function POST(req: Request) {
   });
 
   if (insertError) {
+    logSecurityWarn("db_write_failed", ctx, { table: "posts" });
     return Response.json(
       { error: `Failed to save post: ${insertError.message}` },
-      { status: 500 }
+      { status: 500, headers: { "x-request-id": requestId } }
     );
   }
 
-  return Response.json(result);
+  logSecurityInfo("generate_success", ctx, {
+    mode: body.mode,
+    goal: effectiveGoal,
+  });
+  return Response.json(result, { headers: { "x-request-id": requestId } });
 }
 
