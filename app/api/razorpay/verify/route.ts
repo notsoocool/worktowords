@@ -1,5 +1,6 @@
 import crypto from "node:crypto";
 import { auth } from "@clerk/nextjs/server";
+import Razorpay from "razorpay";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 
 type VerifyBody = {
@@ -19,9 +20,14 @@ export async function POST(req: Request) {
   }
 
   const keySecret = process.env.RAZORPAY_KEY_SECRET;
-  if (!keySecret) {
+  const keyId =
+    process.env.RAZORPAY_KEY_ID || process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
+  if (!keySecret || !keyId) {
     return Response.json(
-      { error: "Missing RAZORPAY_KEY_SECRET" },
+      {
+        error:
+          "Missing Razorpay keys (RAZORPAY_KEY_ID/NEXT_PUBLIC_RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET).",
+      },
       { status: 500 }
     );
   }
@@ -36,6 +42,8 @@ export async function POST(req: Request) {
     return Response.json({ error: "Invalid payment payload." }, { status: 400 });
   }
 
+  // Standard Checkout: HMAC_SHA256(order_id + "|" + razorpay_payment_id, key_secret)
+  // https://razorpay.com/docs/payments/payment-gateway/web-integration/standard/integration-steps/
   const expectedSignature = crypto
     .createHmac("sha256", keySecret)
     .update(`${body.razorpay_order_id}|${body.razorpay_payment_id}`)
@@ -53,6 +61,64 @@ export async function POST(req: Request) {
           "Missing Supabase configuration (NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY or SUPABASE_SERVICE_ROLE_KEY).",
       },
       { status: 500 }
+    );
+  }
+
+  const { data: subRow, error: subFetchError } = await supabase
+    .from("user_subscriptions")
+    .select("razorpay_order_id, payment_id")
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (subFetchError) {
+    return Response.json(
+      { error: `Failed to read subscription: ${subFetchError.message}` },
+      { status: 500 }
+    );
+  }
+
+  if (
+    !subRow?.razorpay_order_id ||
+    subRow.razorpay_order_id !== body.razorpay_order_id
+  ) {
+    return Response.json(
+      { error: "Order mismatch. Please restart checkout." },
+      { status: 400 }
+    );
+  }
+
+  if (subRow.payment_id && subRow.payment_id === body.razorpay_payment_id) {
+    return Response.json({
+      ok: true,
+      alreadyProcessed: true,
+      paymentId: body.razorpay_payment_id,
+    });
+  }
+
+  const razorpay = new Razorpay({
+    key_id: keyId,
+    key_secret: keySecret,
+  });
+
+  const payment = await razorpay.payments
+    .fetch(body.razorpay_payment_id)
+    .catch(() => null);
+  if (!payment) {
+    return Response.json(
+      { error: "Could not fetch payment details from Razorpay." },
+      { status: 400 }
+    );
+  }
+  if (payment.order_id !== body.razorpay_order_id) {
+    return Response.json({ error: "Payment/order mismatch." }, { status: 400 });
+  }
+  if (payment.currency !== "INR" || payment.amount !== 14900) {
+    return Response.json({ error: "Payment amount mismatch." }, { status: 400 });
+  }
+  if (payment.status !== "authorized" && payment.status !== "captured") {
+    return Response.json(
+      { error: `Payment is not successful yet (status: ${payment.status}).` },
+      { status: 400 }
     );
   }
 

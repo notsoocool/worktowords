@@ -1,8 +1,11 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
+import { Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
+import { DashboardOutputSkeleton } from "@/components/dashboard/output-skeleton";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -14,23 +17,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 
 type Mode = "help" | "auto";
 type Goal = "job" | "growth" | "authority";
-type Tone = "casual" | "professional" | "storytelling";
 
 type GenerateResponse = {
   post: string;
   hashtags: string[];
   bestTime: string;
   suggestions: string[];
-};
-
-type HistoryPost = {
-  id: string | number;
-  content: string;
-  hashtags: string[];
-  created_at: string;
 };
 
 type UsageStatus = {
@@ -52,6 +48,7 @@ type RazorpayOrderPayload = {
   prefill?: {
     name?: string;
     email?: string;
+    contact?: string;
   };
 };
 
@@ -74,22 +71,8 @@ type RazorpayCheckoutConstructor = new (options: {
   description: string;
   order_id: string;
   handler: (response: RazorpaySuccessPayload) => void;
-  prefill?: { name?: string; email?: string };
-  method?: {
-    upi?: boolean;
-    card?: boolean;
-    netbanking?: boolean;
-    wallet?: boolean;
-    emi?: boolean;
-    paylater?: boolean;
-  };
-  config?: {
-    display?: {
-      blocks?: Record<string, unknown>;
-      sequence?: string[];
-      preferences?: Record<string, unknown>;
-    };
-  };
+  prefill?: { name?: string; email?: string; contact?: string };
+  notes?: Record<string, string>;
   modal?: { ondismiss?: () => void };
   theme?: { color?: string };
 }) => RazorpayCheckoutInstance;
@@ -160,8 +143,6 @@ export function DashboardUi() {
   const [text, setText] = React.useState("");
   const [mode, setMode] = React.useState<Mode>("help");
   const [goal, setGoal] = React.useState<Goal>("growth");
-  const [defaultGoal, setDefaultGoal] = React.useState<Goal>("growth");
-  const [tone, setTone] = React.useState<Tone>("professional");
   const [isGenerating, setIsGenerating] = React.useState(false);
   const [limitReachedOpen, setLimitReachedOpen] = React.useState(false);
   const [isRegenerating, setIsRegenerating] = React.useState<string | null>(
@@ -169,9 +150,6 @@ export function DashboardUi() {
   );
   const [result, setResult] = React.useState<GenerateResponse | null>(null);
   const [draft, setDraft] = React.useState<string>("");
-  const [history, setHistory] = React.useState<HistoryPost[]>([]);
-  const [historyLoading, setHistoryLoading] = React.useState(false);
-  const [settingsSaving, setSettingsSaving] = React.useState(false);
   const [usage, setUsage] = React.useState<UsageStatus | null>(null);
   const [isUpgrading, setIsUpgrading] = React.useState(false);
 
@@ -203,67 +181,22 @@ export function DashboardUi() {
     try {
       const res = await fetch("/api/settings", { method: "GET" });
       const data = (await res.json().catch(() => null)) as
-        | { defaultGoal?: Goal; tone?: Tone; error?: string }
+        | { defaultGoal?: Goal; error?: string }
         | null;
       if (!res.ok) throw new Error(data?.error || "Failed to load settings.");
 
       const nextGoal = data?.defaultGoal ?? "growth";
-      const nextTone = data?.tone ?? "professional";
-      setDefaultGoal(nextGoal);
       setGoal(nextGoal);
-      setTone(nextTone);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Failed to load settings.";
       toast.error(msg);
     }
   }, []);
 
-  const saveSettings = React.useCallback(
-    async (nextGoal: Goal, nextTone: Tone) => {
-      setSettingsSaving(true);
-      try {
-        const res = await fetch("/api/settings", {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ defaultGoal: nextGoal, tone: nextTone }),
-        });
-        const data = (await res.json().catch(() => null)) as
-          | { ok?: boolean; error?: string }
-          | null;
-        if (!res.ok) throw new Error(data?.error || "Failed to save settings.");
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : "Failed to save settings.";
-        toast.error(msg);
-      } finally {
-        setSettingsSaving(false);
-      }
-    },
-    []
-  );
-
-  const fetchHistory = React.useCallback(async () => {
-    setHistoryLoading(true);
-    try {
-      const res = await fetch("/api/posts", { method: "GET" });
-      const data = (await res.json().catch(() => null)) as
-        | { posts?: HistoryPost[]; error?: string }
-        | null;
-
-      if (!res.ok) throw new Error(data?.error || "Failed to load history.");
-      setHistory(Array.isArray(data?.posts) ? data.posts : []);
-    } catch (e) {
-      const msg = e instanceof Error ? e.message : "Failed to load history.";
-      toast.error(msg);
-    } finally {
-      setHistoryLoading(false);
-    }
-  }, []);
-
   React.useEffect(() => {
     void fetchSettings();
-    void fetchHistory();
     void fetchUsage();
-  }, [fetchHistory, fetchSettings, fetchUsage]);
+  }, [fetchSettings, fetchUsage]);
 
   async function callGenerate({
     userInput,
@@ -339,7 +272,6 @@ export function DashboardUi() {
       const next = data as GenerateResponse;
       setResult(next);
       setDraft(next.post);
-      void fetchHistory();
       void fetchUsage();
       toast.success("Post generated.", { id });
     } catch (e) {
@@ -398,27 +330,6 @@ export function DashboardUi() {
     }
   }
 
-  function loadFromHistory(post: HistoryPost) {
-    setDraft(post.content);
-    setResult({
-      post: post.content,
-      hashtags: post.hashtags ?? [],
-      bestTime: "Generate again to refresh best posting time.",
-      suggestions: ["Generate again to get fresh suggestions for this draft."],
-    });
-    toast.success("Loaded post from history.");
-  }
-
-  function onDefaultGoalChange(value: Goal) {
-    setDefaultGoal(value);
-    void saveSettings(value, tone);
-  }
-
-  function onToneChange(value: Tone) {
-    setTone(value);
-    void saveSettings(defaultGoal, value);
-  }
-
   async function onUpgradeToPro() {
     if (isUpgrading) return;
     if (usage?.plan === "pro") {
@@ -458,31 +369,16 @@ export function DashboardUi() {
         amount: orderData.amount,
         currency: orderData.currency,
         name: "WorktoWords",
-        description: "Pro Plan - INR 149/month",
+        description: "Pro Plan — ₹149/month",
         order_id: orderData.orderId,
         prefill: {
           name: orderData.prefill?.name ?? "",
           email: orderData.prefill?.email ?? "",
+          contact: orderData.prefill?.contact ?? "",
         },
-        method: {
-          upi: true,
-          card: false,
-          netbanking: false,
-          wallet: false,
-          emi: false,
-          paylater: false,
-        },
-        config: {
-          display: {
-            blocks: {
-              upi: {
-                name: "Pay via UPI (GPay, PhonePe, Paytm)",
-                instruments: [{ method: "upi" }],
-              },
-            },
-            sequence: ["block.upi"],
-            preferences: { show_default_blocks: true },
-          },
+        notes: {
+          plan: "pro",
+          source: "worktowords_dashboard",
         },
         handler: async (payment) => {
           try {
@@ -540,7 +436,7 @@ export function DashboardUi() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-10 sm:px-6 lg:py-12">
+    <main className="animate-fade-in mx-auto w-full max-w-6xl flex-1 px-4 py-10 sm:px-6 lg:py-12">
       {limitReachedOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div
@@ -657,17 +553,38 @@ export function DashboardUi() {
         </div>
       </div>
 
-      {!result ? (
-        <div className="saas-card mt-6 p-6 sm:p-8">
-          <div className="flex min-h-40 items-center justify-center rounded-xl border border-dashed bg-background p-6 text-center">
-            <p className="text-sm text-muted-foreground">
-              Your generated post will appear here
+      {isGenerating && !result ? (
+        <DashboardOutputSkeleton className="mt-6 animate-fade-in-delayed" />
+      ) : !result ? (
+        <div className="saas-card mt-6 animate-fade-in p-8 sm:p-10">
+          <div className="flex min-h-[220px] flex-col items-center justify-center rounded-2xl border border-dashed bg-muted/30 px-6 py-12 text-center">
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border bg-background shadow-sm">
+              <Sparkles className="h-6 w-6 text-muted-foreground" aria-hidden />
+            </div>
+            <h2 className="text-base font-semibold tracking-tight">
+              No generated content yet
+            </h2>
+            <p className="mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">
+              Add notes about what you worked on, then hit{" "}
+              <span className="font-medium text-foreground">Generate Post</span>{" "}
+              — your draft, hashtags, and suggestions will show up here.
             </p>
           </div>
         </div>
       ) : (
-        <div className="mt-6 grid gap-6 md:grid-cols-[1.2fr_0.8fr]">
-          <div className="saas-card p-6 sm:p-8">
+        <div className="relative mt-6 grid animate-fade-in gap-6 md:grid-cols-[1.2fr_0.8fr]">
+          {isGenerating ? (
+            <div
+              className="animate-fade-in absolute inset-0 z-10 flex flex-col items-center justify-center gap-3 rounded-2xl bg-background/80 backdrop-blur-sm"
+              aria-live="polite"
+            >
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+              <p className="text-sm font-medium text-muted-foreground">
+                {isRegenerating ? "Refining your post…" : "Generating your post…"}
+              </p>
+            </div>
+          ) : null}
+          <div className={cn("saas-card p-6 sm:p-8", isGenerating && "pointer-events-none opacity-60")}>
             <div className="flex items-start justify-between gap-3">
               <div className="grid gap-1">
                 <p className="text-base font-semibold">Generated post</p>
@@ -735,7 +652,12 @@ export function DashboardUi() {
             </div>
           </div>
 
-          <aside className="saas-card p-6 sm:p-8">
+          <aside
+            className={cn(
+              "saas-card p-6 sm:p-8",
+              isGenerating && "pointer-events-none opacity-60"
+            )}
+          >
             <div className="grid gap-6">
               <div className="grid gap-2">
                 <p className="text-base font-semibold">Hashtags</p>
@@ -782,83 +704,22 @@ export function DashboardUi() {
         </div>
       )}
 
-      <section className="saas-card mt-6 p-6 sm:p-8">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-base font-semibold tracking-tight">Settings</h2>
-          <p className="text-xs text-muted-foreground">
-            {settingsSaving ? "Saving..." : "Saved automatically"}
-          </p>
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="grid gap-2">
-            <Label htmlFor="default-goal">Default goal</Label>
-            <Select value={defaultGoal} onValueChange={(v) => onDefaultGoalChange(v as Goal)}>
-              <SelectTrigger id="default-goal" className="w-full justify-between">
-                <SelectValue placeholder="Select default goal" />
-              </SelectTrigger>
-              <SelectContent align="start">
-                <SelectItem value="job">Get a Job</SelectItem>
-                <SelectItem value="growth">Grow on LinkedIn</SelectItem>
-                <SelectItem value="authority">Build Authority</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="grid gap-2">
-            <Label htmlFor="writing-tone">Writing tone</Label>
-            <Select value={tone} onValueChange={(v) => onToneChange(v as Tone)}>
-              <SelectTrigger id="writing-tone" className="w-full justify-between">
-                <SelectValue placeholder="Select writing tone" />
-              </SelectTrigger>
-              <SelectContent align="start">
-                <SelectItem value="casual">casual</SelectItem>
-                <SelectItem value="professional">professional</SelectItem>
-                <SelectItem value="storytelling">storytelling</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-      </section>
-
-      <section className="saas-card mt-6 p-6 sm:p-8">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-base font-semibold tracking-tight">History</h2>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            onClick={() => void fetchHistory()}
-            disabled={historyLoading}
-          >
-            {historyLoading ? "Refreshing…" : "Refresh"}
-          </Button>
-        </div>
-
-        {history.length === 0 ? (
-          <div className="rounded-xl border border-dashed bg-background p-4 text-sm text-muted-foreground">
-            No posts yet. Generate one to see history here.
-          </div>
-        ) : (
-          <div className="grid gap-2">
-            {history.map((post) => (
-              <button
-                key={post.id}
-                type="button"
-                onClick={() => loadFromHistory(post)}
-                className="rounded-2xl border bg-background p-3 text-left transition-all duration-200 hover:-translate-y-0.5 hover:bg-muted hover:shadow-sm"
-              >
-                <p className="line-clamp-2 text-sm text-foreground">
-                  {post.content}
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {new Date(post.created_at).toLocaleString()}
-                </p>
-              </button>
-            ))}
-          </div>
-        )}
-      </section>
+      <p className="mt-6 text-center text-xs text-muted-foreground animate-fade-in">
+        Default goal and writing tone:{" "}
+        <Link
+          href="/settings"
+          className="font-medium text-foreground underline-offset-4 hover:underline"
+        >
+          Settings
+        </Link>
+        · Past posts:{" "}
+        <Link
+          href="/history"
+          className="font-medium text-foreground underline-offset-4 hover:underline"
+        >
+          History
+        </Link>
+      </p>
     </main>
   );
 }

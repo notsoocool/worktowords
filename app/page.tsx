@@ -1,3 +1,5 @@
+import { BrandLogo } from "@/components/brand-logo";
+import { PricingSection } from "@/components/pricing-section";
 import { Button } from "@/components/ui/button";
 import { StartWritingCta } from "@/components/start-writing-cta";
 
@@ -8,6 +10,13 @@ export default function Home() {
         <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(60%_45%_at_50%_0%,hsl(var(--primary)/0.2),transparent_70%)]" />
         <div className="mx-auto flex w-full max-w-6xl flex-col px-4 py-16 sm:px-6 sm:py-24">
           <div className="mx-auto w-full max-w-3xl text-center">
+            <div className="mb-6 flex justify-center">
+              <BrandLogo
+                size={48}
+                wordmarkClassName="text-xl sm:text-2xl"
+                priority
+              />
+            </div>
             <p className="mb-4 inline-flex items-center rounded-full border bg-background px-3 py-1 text-xs text-muted-foreground">
               Built for developers who want to post consistently
             </p>
@@ -116,45 +125,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="mx-auto w-full max-w-6xl px-4 pb-8 sm:px-6">
-        <div className="saas-card p-6 sm:p-8">
-          <div className="mb-6 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-medium text-muted-foreground">Pricing</p>
-              <h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
-                Choose a plan that fits your posting goals
-              </h2>
-            </div>
-            <p className="text-xs text-muted-foreground">Simple monthly billing</p>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="rounded-2xl border bg-background p-5">
-              <p className="text-sm font-semibold">Free</p>
-              <p className="mt-1 text-2xl font-semibold">₹0</p>
-              <p className="mt-2 text-sm text-muted-foreground">
-                5 generations per day. Great for trying WorktoWords.
-              </p>
-            </div>
-
-            <div className="rounded-2xl border bg-background p-5">
-              <p className="text-sm font-semibold">Pro</p>
-              <p className="mt-1 text-2xl font-semibold">₹149/month</p>
-              <p className="mt-2 text-sm text-muted-foreground">
-                Pay via UPI (GPay, PhonePe, Paytm). Up to 100 generations per day.
-              </p>
-              <div className="mt-4 flex flex-col gap-3 sm:flex-row">
-                <a
-                  href="/dashboard"
-                  className="inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
-                >
-                  Upgrade to Pro
-                </a>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+      <PricingSection />
 
       <section className="mx-auto w-full max-w-6xl px-4 pb-16 sm:px-6 sm:pb-24">
         <div className="saas-card saas-card-hover overflow-hidden p-6 sm:p-8">

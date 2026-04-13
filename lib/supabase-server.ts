@@ -5,6 +5,7 @@ export type PostRow = {
   user_id: string;
   content: string;
   hashtags: string[];
+  goal: "job" | "growth" | "authority";
   created_at: string;
 };
 

@@ -1,5 +1,5 @@
-import Link from "next/link";
-
+import { BrandLogoLink } from "@/components/brand-logo";
+import { AppNavbarLinks } from "@/components/app-navbar";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { Show, SignInButton, UserButton } from "@clerk/nextjs";
@@ -12,20 +12,28 @@ export function Navbar({ className }: { className?: string }) {
   return (
     <header
       className={cn(
-        "sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur supports-backdrop-filter:bg-background/60",
+        "sticky top-0 z-40 w-full border-b border-border/60 bg-background/85 backdrop-blur-md supports-backdrop-filter:bg-background/70",
         className
       )}
     >
-      <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-4 sm:px-6">
-        <Link
-          href="/"
-          className="inline-flex items-center gap-2 text-sm font-semibold tracking-tight transition-colors hover:text-foreground/80"
-        >
-          <span className="text-sm text-muted-foreground">●</span>
-          <span>WorktoWords</span>
-        </Link>
+      <div className="mx-auto flex h-14 w-full max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
+        <div className="flex min-w-0 flex-1 items-center gap-6 lg:gap-10">
+          <BrandLogoLink
+            href="/"
+            priority
+            size={32}
+            className="shrink-0"
+          />
+          {hasClerkKey ? (
+            <Show when="signed-in">
+              <div className="min-w-0 flex-1 overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <AppNavbarLinks />
+              </div>
+            </Show>
+          ) : null}
+        </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
           {!hasClerkKey ? (
             <Button variant="outline" size="sm" disabled>
               Sign In
@@ -49,4 +57,3 @@ export function Navbar({ className }: { className?: string }) {
     </header>
   );
 }
-

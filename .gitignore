@@ -43,6 +43,6 @@ next-env.d.ts
 # clerk configuration (can include secrets)
 /.clerk/
 
-# cursor / local agent artifacts
+# local editor / agent artifacts
 /.agents/
 skills-lock.json

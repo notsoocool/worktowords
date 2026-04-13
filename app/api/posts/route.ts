@@ -1,7 +1,11 @@
 import { auth } from "@clerk/nextjs/server";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 
-export async function GET() {
+function isGoal(v: string | null): v is "job" | "growth" | "authority" {
+  return v === "job" || v === "growth" || v === "authority";
+}
+
+export async function GET(req: Request) {
   const { userId } = await auth();
   if (!userId) {
     return Response.json({ error: "Unauthorized" }, { status: 401 });
@@ -18,12 +22,19 @@ export async function GET() {
     );
   }
 
-  const { data, error } = await supabase
+  const goalParam = new URL(req.url).searchParams.get("goal");
+  let qb = supabase
     .from("posts")
-    .select("id, content, hashtags, created_at")
-    .eq("user_id", userId)
+    .select("id, content, hashtags, goal, created_at")
+    .eq("user_id", userId);
+
+  if (goalParam && isGoal(goalParam)) {
+    qb = qb.eq("goal", goalParam);
+  }
+
+  const { data, error } = await qb
     .order("created_at", { ascending: false })
-    .limit(20);
+    .limit(100);
 
   if (error) {
     return Response.json({ error: error.message }, { status: 500 });

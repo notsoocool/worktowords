@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import { Footer } from "@/components/Footer";
 import { Navbar } from "@/components/navbar";
 import { ClerkProviderWrapper } from "@/app/clerk-provider";
 import { AppToaster } from "@/components/app-toaster";
@@ -20,6 +21,10 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "WorktoWords",
   description: "Turn your daily work into LinkedIn posts.",
+  icons: {
+    icon: "/worktowordslogo.png",
+    apple: "/worktowordslogo.png",
+  },
 };
 
 export default function RootLayout({
@@ -33,11 +38,12 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col">
+      <body className="min-h-full flex flex-col bg-background">
         <AppThemeProvider>
           <ClerkProviderWrapper>
             <Navbar />
-            <div className="flex flex-1 flex-col">{children}</div>
+            <div className="flex min-h-0 flex-1 flex-col">{children}</div>
+            <Footer />
             <AppToaster />
             <ThemeRippleToggle />
           </ClerkProviderWrapper>

@@ -132,6 +132,10 @@
   html {
     @apply font-sans;
   }
+  /* Clickable anchors (e.g. Next.js Link) use pointer by default in most UIs */
+  a[href] {
+    @apply cursor-pointer;
+  }
 }
 
 @layer components {
@@ -141,6 +145,28 @@
 
   .saas-card-hover {
     @apply hover:shadow-md hover:-translate-y-0.5;
+  }
+}
+
+@layer utilities {
+  .animate-fade-in {
+    animation: fade-in 0.45s ease-out forwards;
+  }
+
+  .animate-fade-in-delayed {
+    animation: fade-in 0.5s ease-out 0.05s forwards;
+    opacity: 0;
+  }
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
   }
 }
 

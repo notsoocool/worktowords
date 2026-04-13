@@ -233,6 +233,7 @@ export async function POST(req: Request) {
     user_id: userId,
     content: result.post,
     hashtags: result.hashtags,
+    goal: effectiveGoal,
   });
 
   if (insertError) {

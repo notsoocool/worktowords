@@ -3,11 +3,15 @@ create table if not exists public.posts (
   user_id text not null,
   content text not null,
   hashtags text[] not null default '{}',
+  goal text not null default 'growth' check (goal in ('job', 'growth', 'authority')),
   created_at timestamptz not null default now()
 );
 
 create index if not exists posts_user_id_created_at_idx
   on public.posts (user_id, created_at desc);
+
+create index if not exists posts_user_id_goal_created_at_idx
+  on public.posts (user_id, goal, created_at desc);
 
 create table if not exists public.user_settings (
   user_id text primary key,
@@ -37,6 +41,10 @@ create table if not exists public.user_subscriptions (
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+create unique index if not exists user_subscriptions_payment_id_uidx
+  on public.user_subscriptions (payment_id)
+  where payment_id is not null;
 
 create or replace function public.check_and_increment_usage(p_user_id text)
 returns table(

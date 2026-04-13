@@ -111,6 +111,17 @@ Functions:
 - `POST /api/razorpay/create-order` → create Razorpay order for Pro (₹149)
 - `POST /api/razorpay/verify` → verify signature + activate Pro for 30 days
 
+## 💳 Razorpay (Standard Web Checkout)
+
+This app follows Razorpay’s [Standard Checkout integration steps](https://razorpay.com/docs/payments/payment-gateway/web-integration/standard/integration-steps/):
+
+1. **Server**: `POST /api/razorpay/create-order` creates an **Order** via the Orders API (amount in paise, `INR`).
+2. **Client**: loads `https://checkout.razorpay.com/v1/checkout.js` and opens Checkout with `key`, `order_id`, `amount`, `currency`, `prefill` (name, email, contact).
+3. **Success**: the `handler` receives `razorpay_payment_id`, `razorpay_order_id`, `razorpay_signature`.
+4. **Server**: `POST /api/razorpay/verify` verifies the signature with `RAZORPAY_KEY_SECRET`, then activates Pro.
+
+Use **Test mode** API keys from the Razorpay Dashboard while developing; switch to **Live** keys for production. Enable **automatic payment capture** for orders in the Dashboard so payments move to `captured`.
+
 ## 🧪 Notes
 
 - ✅ Secrets are kept in `.env.local` (ignored by git).
