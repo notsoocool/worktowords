@@ -3,7 +3,7 @@ import Link from "next/link";
 
 import { cn } from "@/lib/utils";
 
-export const BRAND_LOGO_SRC = "/worktowordslogo.png";
+export const BRAND_LOGO_SRC = "/worktowordslogo.svg";
 
 export type BrandLogoProps = {
   className?: string;

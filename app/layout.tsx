@@ -22,8 +22,7 @@ export const metadata: Metadata = {
   title: "WorktoWords",
   description: "Turn your daily work into LinkedIn posts.",
   icons: {
-    icon: "/worktowordslogo.png",
-    apple: "/worktowordslogo.png",
+    icon: "/worktowordslogo.svg",
   },
 };
 
