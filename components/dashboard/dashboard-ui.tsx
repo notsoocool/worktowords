@@ -300,11 +300,13 @@ export function DashboardUi() {
   }
 
   return (
-    <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-10 sm:px-6">
-      <div className="rounded-2xl border bg-card p-6 shadow-sm">
+    <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-10 sm:px-6 lg:py-12">
+      <div className="saas-card p-6 sm:p-8">
         <div className="flex flex-col gap-6">
           <div className="grid gap-2">
-            <Label htmlFor="work">What did you work on today?</Label>
+            <Label htmlFor="work" className="text-sm font-semibold">
+              What did you work on today?
+            </Label>
             <Textarea
               id="work"
               placeholder="What did you work on today?"
@@ -316,7 +318,9 @@ export function DashboardUi() {
 
           <div className="grid gap-4 sm:grid-cols-2 sm:items-end">
             <div className="grid gap-2">
-              <Label htmlFor="goal">Goal</Label>
+              <Label htmlFor="goal" className="text-sm font-semibold">
+                Goal
+              </Label>
               <Select value={goal} onValueChange={(v) => setGoal(v as Goal)}>
                 <SelectTrigger className="w-full justify-between">
                   <SelectValue placeholder="Select a goal" />
@@ -330,7 +334,7 @@ export function DashboardUi() {
             </div>
 
             <div className="grid gap-2">
-              <Label>Mode</Label>
+              <Label className="text-sm font-semibold">Mode</Label>
               <Tabs
                 value={mode}
                 onValueChange={(v) => setMode(v as Mode)}
@@ -352,7 +356,7 @@ export function DashboardUi() {
             <Button
               onClick={onGenerate}
               disabled={isGenerating}
-              className="h-11 px-6"
+              className="h-11 rounded-xl px-6 transition-transform hover:-translate-y-0.5"
             >
               {isGenerating ? "Generating…" : "Generate Post"}
             </Button>
@@ -361,7 +365,7 @@ export function DashboardUi() {
       </div>
 
       {!result ? (
-        <div className="mt-6 rounded-2xl border bg-card p-6 shadow-sm">
+        <div className="saas-card mt-6 p-6 sm:p-8">
           <div className="flex min-h-40 items-center justify-center rounded-xl border border-dashed bg-background p-6 text-center">
             <p className="text-sm text-muted-foreground">
               Your generated post will appear here
@@ -370,10 +374,10 @@ export function DashboardUi() {
         </div>
       ) : (
         <div className="mt-6 grid gap-6 md:grid-cols-[1.2fr_0.8fr]">
-          <div className="rounded-2xl border bg-card p-6 shadow-sm">
+          <div className="saas-card p-6 sm:p-8">
             <div className="flex items-start justify-between gap-3">
               <div className="grid gap-1">
-                <p className="text-sm font-medium">Generated post</p>
+                <p className="text-base font-semibold">Generated post</p>
                 <p className="text-xs text-muted-foreground">
                   Edit it before posting.
                 </p>
@@ -438,10 +442,10 @@ export function DashboardUi() {
             </div>
           </div>
 
-          <aside className="rounded-2xl border bg-card p-6 shadow-sm">
+          <aside className="saas-card p-6 sm:p-8">
             <div className="grid gap-6">
               <div className="grid gap-2">
-                <p className="text-sm font-medium">Hashtags</p>
+                <p className="text-base font-semibold">Hashtags</p>
                 {result.hashtags.length === 0 ? (
                   <p className="text-sm text-muted-foreground">None</p>
                 ) : (
@@ -459,12 +463,12 @@ export function DashboardUi() {
               </div>
 
               <div className="grid gap-2">
-                <p className="text-sm font-medium">Best time to post</p>
+                <p className="text-base font-semibold">Best time to post</p>
                 <p className="text-sm text-muted-foreground">{result.bestTime}</p>
               </div>
 
               <div className="grid gap-2">
-                <p className="text-sm font-medium">Suggestions</p>
+                <p className="text-base font-semibold">Suggestions</p>
                 {result.suggestions.length === 0 ? (
                   <p className="text-sm text-muted-foreground">None</p>
                 ) : (
@@ -485,9 +489,9 @@ export function DashboardUi() {
         </div>
       )}
 
-      <section className="mt-6 rounded-2xl border bg-card p-6 shadow-sm">
+      <section className="saas-card mt-6 p-6 sm:p-8">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-medium">Settings</h2>
+          <h2 className="text-base font-semibold tracking-tight">Settings</h2>
           <p className="text-xs text-muted-foreground">
             {settingsSaving ? "Saving..." : "Saved automatically"}
           </p>
@@ -524,9 +528,9 @@ export function DashboardUi() {
         </div>
       </section>
 
-      <section className="mt-6 rounded-2xl border bg-card p-6 shadow-sm">
+      <section className="saas-card mt-6 p-6 sm:p-8">
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-medium">History</h2>
+          <h2 className="text-base font-semibold tracking-tight">History</h2>
           <Button
             type="button"
             variant="ghost"
@@ -549,7 +553,7 @@ export function DashboardUi() {
                 key={post.id}
                 type="button"
                 onClick={() => loadFromHistory(post)}
-                className="rounded-xl border bg-background p-3 text-left transition-colors hover:bg-muted"
+                className="rounded-2xl border bg-background p-3 text-left transition-all duration-200 hover:-translate-y-0.5 hover:bg-muted hover:shadow-sm"
               >
                 <p className="line-clamp-2 text-sm text-foreground">
                   {post.content}

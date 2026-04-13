@@ -4,6 +4,8 @@ import "./globals.css";
 import { Navbar } from "@/components/navbar";
 import { ClerkProviderWrapper } from "@/app/clerk-provider";
 import { AppToaster } from "@/components/app-toaster";
+import { AppThemeProvider } from "@/app/theme-provider";
+import { ThemeRippleToggle } from "@/components/theme-ripple-toggle";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -29,13 +31,17 @@ export default function RootLayout({
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+      suppressHydrationWarning
     >
       <body className="min-h-full flex flex-col">
-        <ClerkProviderWrapper>
-          <Navbar />
-          <div className="flex flex-1 flex-col">{children}</div>
-          <AppToaster />
-        </ClerkProviderWrapper>
+        <AppThemeProvider>
+          <ClerkProviderWrapper>
+            <Navbar />
+            <div className="flex flex-1 flex-col">{children}</div>
+            <AppToaster />
+            <ThemeRippleToggle />
+          </ClerkProviderWrapper>
+        </AppThemeProvider>
       </body>
     </html>
   );

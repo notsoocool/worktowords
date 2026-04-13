@@ -12,14 +12,14 @@ export function Navbar({ className }: { className?: string }) {
   return (
     <header
       className={cn(
-        "sticky top-0 z-40 w-full border-b bg-background/70 backdrop-blur",
+        "sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur supports-backdrop-filter:bg-background/60",
         className
       )}
     >
       <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between px-4 sm:px-6">
         <Link
           href="/"
-          className="inline-flex items-center gap-2 font-semibold tracking-tight"
+          className="inline-flex items-center gap-2 text-sm font-semibold tracking-tight transition-colors hover:text-foreground/80"
         >
           <span className="text-sm text-muted-foreground">●</span>
           <span>WorktoWords</span>
@@ -34,7 +34,7 @@ export function Navbar({ className }: { className?: string }) {
             <>
               <Show when="signed-out">
                 <SignInButton mode="modal">
-                  <Button variant="outline" size="sm">
+                  <Button variant="outline" size="sm" className="rounded-xl">
                     Sign In
                   </Button>
                 </SignInButton>

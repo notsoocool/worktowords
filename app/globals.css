@@ -127,9 +127,25 @@
     @apply border-border outline-ring/50;
   }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
   }
   html {
     @apply font-sans;
   }
+}
+
+@layer components {
+  .saas-card {
+    @apply rounded-2xl border bg-card shadow-sm transition-all duration-200;
+  }
+
+  .saas-card-hover {
+    @apply hover:shadow-md hover:-translate-y-0.5;
+  }
+}
+
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
 }
