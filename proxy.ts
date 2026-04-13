@@ -47,7 +47,12 @@ function contentSecurityPolicy() {
 
   const fapi = clerkFrontendApiOrigin();
   const accounts = clerkAccountsPortalOrigin();
-  const clerkCustom = [fapi, accounts].filter(Boolean).join(" ");
+  // Safety fallback for production when env vars are not set in hosting.
+  const knownClerkOrigins = ["https://clerk.worktowords.in", "https://accounts.worktowords.in"];
+  const clerkCustom = [fapi, accounts, ...knownClerkOrigins]
+    .filter(Boolean)
+    .filter((origin, idx, arr) => arr.indexOf(origin) === idx)
+    .join(" ");
   const clerkCustomPart = clerkCustom ? ` ${clerkCustom}` : "";
   const clerkTelemetry =
     " https://clerk-telemetry.com https://*.clerk-telemetry.com";
