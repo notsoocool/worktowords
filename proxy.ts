@@ -13,6 +13,31 @@ const clerk = clerkMiddleware((auth, req) => {
   if (!isPublicRoute(req)) auth.protect();
 });
 
+function clerkHttpsOrigin(
+  ...envKeys: (string | undefined)[]
+): string | null {
+  for (const raw of envKeys) {
+    if (typeof raw !== "string") continue;
+    const trimmed = raw.trim().replace(/\/$/, "");
+    if (trimmed.startsWith("https://")) return trimmed;
+  }
+  return null;
+}
+
+function clerkFrontendApiOrigin(): string | null {
+  return clerkHttpsOrigin(
+    process.env.NEXT_PUBLIC_CLERK_FRONTEND_API,
+    process.env.CLERK_FRONTEND_API
+  );
+}
+
+function clerkAccountsPortalOrigin(): string | null {
+  return clerkHttpsOrigin(
+    process.env.NEXT_PUBLIC_CLERK_ACCOUNTS_ORIGIN,
+    process.env.CLERK_ACCOUNTS_ORIGIN
+  );
+}
+
 function contentSecurityPolicy() {
   const isProd = process.env.NODE_ENV === "production";
   const connectDev =
@@ -20,18 +45,26 @@ function contentSecurityPolicy() {
       ? ""
       : " ws://localhost:* http://localhost:*";
 
+  const fapi = clerkFrontendApiOrigin();
+  const accounts = clerkAccountsPortalOrigin();
+  const clerkCustom = [fapi, accounts].filter(Boolean).join(" ");
+  const clerkCustomPart = clerkCustom ? ` ${clerkCustom}` : "";
+  const clerkTelemetry =
+    " https://clerk-telemetry.com https://*.clerk-telemetry.com";
+  const cloudflareChallenge = " https://challenges.cloudflare.com";
+
   const directives = [
     "default-src 'self'",
     "base-uri 'self'",
     "frame-ancestors 'none'",
     "object-src 'none'",
-    "form-action 'self'",
-    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com https://*.clerk.com https://*.clerk.accounts.dev",
+    `form-action 'self'${clerkCustomPart}`,
+    `script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com https://*.clerk.com https://*.clerk.accounts.dev${clerkCustomPart}${cloudflareChallenge}`,
     "style-src 'self' 'unsafe-inline'",
-    "img-src 'self' data: blob: https:",
+    "img-src 'self' data: blob: https: https://img.clerk.com",
     "font-src 'self' data:",
-    `connect-src 'self' https://api.openai.com https://*.supabase.co https://api.razorpay.com https://*.clerk.com https://*.clerk.accounts.dev${connectDev}`,
-    "frame-src 'self' https://api.razorpay.com https://checkout.razorpay.com https://*.clerk.com https://*.clerk.accounts.dev",
+    `connect-src 'self' https://api.openai.com https://*.supabase.co https://api.razorpay.com https://*.clerk.com https://*.clerk.accounts.dev${clerkCustomPart}${clerkTelemetry}${cloudflareChallenge}${connectDev}`,
+    `frame-src 'self' https://api.razorpay.com https://checkout.razorpay.com https://*.clerk.com https://*.clerk.accounts.dev${clerkCustomPart}${cloudflareChallenge}`,
     "worker-src 'self' blob:",
   ];
 
