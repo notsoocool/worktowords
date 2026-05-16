@@ -244,12 +244,18 @@ export async function POST(req: Request) {
     body.userInput.trim(),
   ].join("\n");
 
-  const client = new OpenAI({ apiKey });
+  const baseURL = process.env.OPENAI_BASE_URL;
+  const modelName = process.env.OPENAI_MODEL || "gpt-4o-mini";
+
+  const client = new OpenAI({ 
+    apiKey,
+    ...(baseURL ? { baseURL } : {})
+  });
 
   let completion;
   try {
     completion = await client.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: modelName,
       temperature: 0.7,
       response_format: { type: "json_object" },
       messages: [
