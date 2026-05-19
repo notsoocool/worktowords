@@ -1,7 +1,7 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { NextResponse, type NextRequest } from "next/server";
 
-const isPublicRoute = createRouteMatcher(["/", "/api/health(.*)"]);
+const isPublicRoute = createRouteMatcher(["/", "/api/health(.*)", "/api/webhooks/razorpay"]);
 
 const hasClerkKeys =
   typeof process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY === "string" &&
@@ -47,7 +47,6 @@ function contentSecurityPolicy() {
 
   const fapi = clerkFrontendApiOrigin();
   const accounts = clerkAccountsPortalOrigin();
-  // Safety fallback for production when env vars are not set in hosting.
   const knownClerkOrigins = ["https://clerk.worktowords.in", "https://accounts.worktowords.in"];
   const clerkCustom = [fapi, accounts, ...knownClerkOrigins]
     .filter(Boolean)
@@ -110,17 +109,13 @@ function withSecurityHeaders(req: NextRequest, res: Response) {
 export default async function proxy(req: NextRequest) {
   if (!hasClerkKeys) return withSecurityHeaders(req, NextResponse.next());
 
-  // Delegate auth protection to Clerk proxy when configured.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const res = await (clerk as any)(req);
   return withSecurityHeaders(req, res ?? NextResponse.next());
 }
 
 export const config = {
   matcher: [
-    // Protect all routes except for static files and Next internals.
     "/((?!_next|.*\\.(?:css|js|json|jpg|jpeg|png|gif|svg|ico|webp|map|txt|xml)$).*)",
-    // Always run for API routes.
     "/(api|trpc)(.*)",
   ],
 };

@@ -8,7 +8,6 @@ export type ProPlan = "pro";
 const PRO_PLAN_AMOUNT_INR_PAISE = 14900;
 
 function buildReceipt(userId: string) {
-  // Razorpay receipt max length is 40 chars.
   const ts = Date.now().toString().slice(-10);
   const safeUser = userId.replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 24);
   return `w2w_${safeUser}_${ts}`.slice(0, 40);
@@ -57,6 +56,73 @@ export type CreateOrderResult = {
   };
 };
 
+// ==========================================
+// SHARED UPGRADE LOGIC (For Frontend & Webhook)
+// ==========================================
+export async function processProUpgrade(
+  userId: string,
+  paymentId: string,
+  orderId: string,
+  amountPaise: number,
+  currency: string
+): Promise<{ ok: boolean; planExpiryYmd: string; alreadyProcessed?: boolean }> {
+  const supabase = mustGetSupabase();
+  const nowIso = new Date().toISOString();
+
+  const { data: existingSub } = await supabase
+    .from("user_subscriptions")
+    .select("payment_id")
+    .eq("razorpay_order_id", orderId)
+    .single();
+
+  if (existingSub && existingSub.payment_id === paymentId) {
+    console.log("Payment already processed. Skipping upgrade.");
+    const planExpiryDate = new Date();
+    planExpiryDate.setDate(planExpiryDate.getDate() + 30);
+    return { ok: true, planExpiryYmd: planExpiryDate.toISOString().slice(0, 10), alreadyProcessed: true };
+  }
+
+  const planExpiry = new Date();
+  planExpiry.setDate(planExpiry.getDate() + 30);
+  const planExpiryYmd = planExpiry.toISOString().slice(0, 10);
+
+  const { error: usageError } = await supabase.from("user_usage").upsert(
+    {
+      user_id: userId,
+      plan: "pro",
+      plan_expiry: planExpiryYmd,
+      updated_at: nowIso,
+    },
+    { onConflict: "user_id" }
+  );
+
+  if (usageError) throw new Error(`Failed to upgrade plan: ${usageError.message}`);
+
+  const { error: subError } = await supabase.from("user_subscriptions").upsert(
+    {
+      user_id: userId,
+      payment_id: paymentId,
+      razorpay_order_id: orderId,
+      plan: "pro",
+      plan_status: "active",
+      plan_expiry: planExpiryYmd,
+      amount_paise: amountPaise,
+      currency: currency,
+      updated_at: nowIso,
+    },
+    { onConflict: "user_id" }
+  );
+
+  if (subError) {
+    throw new Error(`Failed to store payment details: ${subError.message}`);
+  }
+
+  return { ok: true, planExpiryYmd };
+}
+
+// ==========================================
+// ORDER CREATION
+// ==========================================
 export async function createOrder(userId: string): Promise<CreateOrderResult> {
   const user = await currentUser();
   const { keyId, keySecret } = mustGetRazorpayKeys();
@@ -73,7 +139,7 @@ export async function createOrder(userId: string): Promise<CreateOrderResult> {
       currency: "INR",
       receipt: buildReceipt(userId),
       notes: {
-        userId,
+        userId: userId,
         plan: "pro",
       },
     });
@@ -129,6 +195,9 @@ export async function createOrder(userId: string): Promise<CreateOrderResult> {
   };
 }
 
+// ==========================================
+// CLIENT VERIFICATION
+// ==========================================
 export async function verifyPayment(args: {
   userId: string;
   paymentId: string;
@@ -139,7 +208,7 @@ export async function verifyPayment(args: {
   plan: ProPlan;
   paymentId: string;
   planStatus: "active";
-  planExpiry: string; // YYYY-MM-DD
+  planExpiry: string; 
   alreadyProcessed?: boolean;
 }> {
   const { keyId, keySecret } = mustGetRazorpayKeys();
@@ -164,8 +233,6 @@ export async function verifyPayment(args: {
   }
 
   if (subRow.payment_id && subRow.payment_id === args.paymentId) {
-    // Mirror previous API behavior: treat it as already verified.
-    // The route will map this to { ok, alreadyProcessed, paymentId }.
     return {
       ok: true,
       alreadyProcessed: true,
@@ -176,7 +243,6 @@ export async function verifyPayment(args: {
     };
   }
 
-  // Standard Checkout: HMAC_SHA256(order_id + "|" + razorpay_payment_id, key_secret)
   const expectedSignature = crypto
     .createHmac("sha256", keySecret)
     .update(`${subRow.razorpay_order_id}|${args.paymentId}`)
@@ -204,41 +270,13 @@ export async function verifyPayment(args: {
     throw new Error(`Payment is not successful yet (status: ${payment.status}).`);
   }
 
-  const nowIso = new Date().toISOString();
-  const planExpiry = new Date();
-  planExpiry.setDate(planExpiry.getDate() + 30);
-  const planExpiryYmd = planExpiry.toISOString().slice(0, 10);
-
-  const { error: usageError } = await supabase.from("user_usage").upsert(
-    {
-      user_id: args.userId,
-      plan: "pro",
-      plan_expiry: planExpiryYmd,
-      updated_at: nowIso,
-    },
-    { onConflict: "user_id" }
+  const { planExpiryYmd } = await processProUpgrade(
+    args.userId,
+    args.paymentId,
+    subRow.razorpay_order_id,
+    PRO_PLAN_AMOUNT_INR_PAISE,
+    "INR"
   );
-
-  if (usageError) throw new Error(`Failed to upgrade plan: ${usageError.message}`);
-
-  const { error: subError } = await supabase.from("user_subscriptions").upsert(
-    {
-      user_id: args.userId,
-      payment_id: args.paymentId,
-      razorpay_order_id: subRow.razorpay_order_id,
-      plan: "pro",
-      plan_status: "active",
-      plan_expiry: planExpiryYmd,
-      amount_paise: PRO_PLAN_AMOUNT_INR_PAISE,
-      currency: "INR",
-      updated_at: nowIso,
-    },
-    { onConflict: "user_id" }
-  );
-
-  if (subError) {
-    throw new Error(`Failed to store payment details: ${subError.message}`);
-  }
 
   return {
     ok: true,
@@ -249,7 +287,6 @@ export async function verifyPayment(args: {
   };
 }
 
-// Backwards-compatible aliases (kept for now).
 export async function createProOrder(args: { userId: string }): Promise<CreateOrderResult> {
   return createOrder(args.userId);
 }
@@ -274,4 +311,3 @@ export async function verifyProPayment(args: {
     orderId: args.razorpay_order_id,
   });
 }
-
