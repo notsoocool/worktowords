@@ -1,131 +1,182 @@
 # ✍️ WorktoWords
 
-Turn your daily work into **LinkedIn posts** — fast, clean, and consistently on-brand.
+Turn your daily work into **social-ready content** — LinkedIn posts, Instagram captions, and YouTube scripts — fast, clean, and on-brand.
 
 ## ✨ Features
 
-- 🔐 **Auth** with Clerk (Google sign-in supported)
-- 🧠 **AI post generation** via OpenAI
-- 💳 **Pro upgrade** via Razorpay (UPI-focused checkout)
-- 📅 **Pro expiry**: Pro is active for 30 days after payment, then auto-downgrades to Free
-- 📊 **Usage limits**:
-  - Free: 5 generations/day
-  - Pro: 100 generations/day
-- 🧾 **History**: every generated post is saved and reloadable
-- ⚙️ **Settings** per user:
-  - Default goal: `job` / `growth` / `authority`
-  - Writing tone: `casual` / `professional` / `storytelling`
-- 🎛️ **Regenerate** controls: shorter, more casual, more technical, storytelling
-- 🔔 **Live toasts** while generating (human-friendly progress)
+- 🔐 **Auth** with [Clerk](https://clerk.com) (Google sign-in supported)
+- 🧠 **AI generation** via OpenAI — **Help Me Write** and **Write For Me** modes
+- 📱 **Multi-platform output** — LinkedIn, Instagram, and YouTube (select one or more per run)
+- 🎯 **Goals** — `job` · `growth` · `authority` (per post or default in settings)
+- 💳 **Pro upgrade** via Razorpay (₹149 / 30 days, UPI-friendly checkout)
+- 📅 **Pro expiry** — auto-downgrades to Free after 30 days
+- 📊 **Usage limits**
+  - Free: **5** generations/day
+  - Pro: **100** generations/day
+- 🧾 **History** — saved posts, filter by goal, reopen on the dashboard
+- ⚙️ **Settings** — default goal + tone (`casual` · `professional` · `storytelling`)
+- 🎛️ **Regenerate** — per-platform refresh; adjust length, tone, technical level, storytelling
+- 🔔 **Live toasts** during generation
+- 🌓 **Light / dark** theme
 
 ## 🧰 Tech Stack
 
-- **Next.js** (App Router) + TypeScript
+- **Next.js 16** (App Router) + **TypeScript**
 - **Tailwind CSS** + **shadcn/ui**
-- **Clerk** for authentication
-- **Supabase Postgres** for persistence
-- **OpenAI** for generation
+- **Clerk** — authentication
+- **Supabase Postgres** — posts, settings, usage, subscriptions
+- **OpenAI** — content generation
+- **Razorpay** — payments
 
 ## ✅ Prerequisites
 
-- Node.js 20+
-- pnpm
+- **Node.js 20+**
+- **pnpm 9+**
 
 ## 🚀 Getting Started
 
-Install dependencies:
-
 ```bash
+git clone https://github.com/notsoocool/worktowords.git
+cd worktowords
 pnpm install
 ```
 
 Create `.env.local`:
 
 ```bash
+# Clerk
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=
 CLERK_SECRET_KEY=
 
+# OpenAI
 OPENAI_API_KEY=
 
+# Supabase (server routes use the service role key)
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
 
-# Razorpay (use test keys locally)
+# Razorpay — use test keys locally
 NEXT_PUBLIC_RAZORPAY_KEY_ID=
 RAZORPAY_KEY_ID=
 RAZORPAY_KEY_SECRET=
 ```
 
-Run the dev server:
+Optional:
+
+```bash
+# Bypass daily limits for admin/testing (comma-separated Clerk user IDs)
+ROOT_USER_ID=
+# ROOT_USER_IDS=
+
+# Custom Clerk domains (production)
+# NEXT_PUBLIC_CLERK_FRONTEND_API=
+# NEXT_PUBLIC_CLERK_ACCOUNTS_ORIGIN=
+```
+
+### Database
+
+In the [Supabase](https://supabase.com) SQL editor, run the full schema:
+
+```text
+supabase/posts.sql
+```
+
+This creates tables, indexes, RLS policies, and `check_and_increment_usage()` (required for generation limits).
+
+### Run locally
 
 ```bash
 pnpm dev
 ```
 
-Open `http://localhost:3000`.
+Open [http://localhost:3000](http://localhost:3000).
+
+### Scripts
+
+| Command | Description |
+|---------|-------------|
+| `pnpm dev` | Development server |
+| `pnpm build` | Production build |
+| `pnpm start` | Run production build |
+| `pnpm lint` | ESLint |
+| `pnpm typecheck` | TypeScript (`tsc --noEmit`) |
 
 ## 🗄️ Database (Supabase)
 
-This repo includes the schema in `supabase/posts.sql`.
+| Table | Purpose |
+|-------|---------|
+| `posts` | Generated content (`content`, `hashtags`, `goal`, `type`, `linkedin`, `instagram`, `youtube`) |
+| `user_settings` | Default goal + writing tone |
+| `user_usage` | Daily usage, plan, expiry |
+| `user_subscriptions` | Razorpay order/payment refs, plan status |
 
-Tables:
-- **posts**
-  - `user_id`
-  - `content`
-  - `hashtags`
-  - `created_at`
-- **user_settings**
-  - `user_id`
-  - `default_goal`
-  - `tone`
-  - `updated_at`
-- **user_usage**
-  - `user_id`
-  - `daily_usage`
-  - `last_used_date`
-  - `plan` (`free` | `pro`)
-  - `plan_expiry` (date)
-  - `updated_at`
-- **user_subscriptions**
-  - `user_id`
-  - `payment_id`
-  - `razorpay_order_id`
-  - `plan` (`free` | `pro`)
-  - `plan_status` (`inactive` | `active`)
-  - `plan_expiry` (date)
-  - `amount_paise`
-  - `currency`
-  - `created_at`
-  - `updated_at`
-
-Functions:
-- `check_and_increment_usage(user_id)` (atomic daily limit + auto downgrade when expired)
+**Function:** `check_and_increment_usage(user_id)` — atomic daily limit check + Pro expiry downgrade.
 
 ## 🔌 API Routes
 
-- `POST /api/generate` → generate + save a post
-- `GET /api/posts` → fetch post history
-- `GET /api/settings` → fetch settings
-- `PATCH /api/settings` → update settings
-- `GET /api/usage` → usage + plan status (remaining generations)
-- `POST /api/razorpay/create-order` → create Razorpay order for Pro (₹149)
-- `POST /api/razorpay/verify` → verify signature + activate Pro for 30 days
+| Method | Route | Description |
+|--------|-------|-------------|
+| `GET` | `/api/health` | Liveness check |
+| `POST` | `/api/generate` | Generate + save post(s) |
+| `GET` | `/api/posts` | List history (`?goal=` optional) |
+| `GET` | `/api/posts/[id]` | Single post |
+| `GET` | `/api/settings` | User settings |
+| `PATCH` | `/api/settings` | Update settings |
+| `GET` | `/api/usage` | Remaining generations + plan |
+| `POST` | `/api/razorpay/create-order` | Create Pro order (₹149) |
+| `POST` | `/api/razorpay/verify` | Verify payment + activate Pro |
 
-## 💳 Razorpay (Standard Web Checkout)
+## 💳 Razorpay (Standard Checkout)
 
-This app follows Razorpay’s [Standard Checkout integration steps](https://razorpay.com/docs/payments/payment-gateway/web-integration/standard/integration-steps/):
+Flow ([Razorpay docs](https://razorpay.com/docs/payments/payment-gateway/web-integration/standard/integration-steps/)):
 
-1. **Server**: `POST /api/razorpay/create-order` creates an **Order** via the Orders API (amount in paise, `INR`).
-2. **Client**: loads `https://checkout.razorpay.com/v1/checkout.js` and opens Checkout with `key`, `order_id`, `amount`, `currency`, `prefill` (name, email, contact).
-3. **Success**: the `handler` receives `razorpay_payment_id`, `razorpay_order_id`, `razorpay_signature`.
-4. **Server**: `POST /api/razorpay/verify` verifies the signature with `RAZORPAY_KEY_SECRET`, then activates Pro.
+1. **Server** — `POST /api/razorpay/create-order` creates an order (14900 paise, INR) and stores a pending row in `user_subscriptions`.
+2. **Client** — Opens Checkout with `key`, `order_id`, `amount`, `currency`, `prefill`.
+3. **Success** — Client receives `razorpay_payment_id`, `razorpay_order_id`, `razorpay_signature`.
+4. **Server** — `POST /api/razorpay/verify` validates the signature and upgrades the user to Pro for 30 days.
 
-Use **Test mode** API keys from the Razorpay Dashboard while developing; switch to **Live** keys for production. Enable **automatic payment capture** for orders in the Dashboard so payments move to `captured`.
+Use **test** keys in development; **live** keys in production. Enable **automatic capture** for orders in the Razorpay Dashboard.
+
+## 🚢 Deployment
+
+Set the same environment variables on your host (e.g. Vercel). **Required for core features:**
+
+- Clerk keys
+- `OPENAI_API_KEY`
+- `NEXT_PUBLIC_SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` (usage, posts, payments)
+- Razorpay keys
+
+After deploy:
+
+1. Confirm `supabase/posts.sql` has been applied to your production project.
+2. Hit `GET /api/health` to confirm the app is up.
+3. Run a test generation and (optionally) a Razorpay test checkout.
+
+## 🤝 Contributing
+
+We welcome contributions — especially for [open issues](https://github.com/notsoocool/worktowords/issues).
+
+- Read **[CONTRIBUTING.md](./CONTRIBUTING.md)** for setup, conventions, and PR expectations.
+- Every PR runs **lint**, **typecheck**, and **build** in GitHub Actions.
+- Comment on an issue before starting large changes.
+
+## 📁 Project layout
+
+```text
+app/              Pages and API routes
+components/       UI (dashboard, history, settings, …)
+lib/services/     Business logic (generate, payments, usage, posts)
+lib/ai/           Platform-specific AI prompts (LinkedIn, Instagram, YouTube)
+supabase/         SQL schema
+proxy.ts          Auth (Clerk) + security headers
+```
 
 ## 🧪 Notes
 
-- ✅ Secrets are kept in `.env.local` (ignored by git).
-- 🧩 The dashboard is protected (`/dashboard`) — signed out users are redirected home.
+- Secrets live in `.env.local` (gitignored).
+- `/dashboard`, `/history`, and `/settings` require sign-in (Clerk).
+- Server-side Supabase access uses the **service role** key — never expose it to the client.
 
 ## 📄 License
 
