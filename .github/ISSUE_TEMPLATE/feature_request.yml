@@ -1,0 +1,53 @@
+name: Feature request
+description: Suggest an improvement or new capability
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the suggestion. Search [existing issues](https://github.com/notsoocool/worktowords/issues) first to avoid duplicates.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / motivation
+      description: What problem does this solve? Who benefits?
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: How would you like this to work?
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Optional — other approaches you thought about.
+    validations:
+      required: false
+
+  - type: dropdown
+    id: difficulty
+    attributes:
+      label: Estimated difficulty (optional)
+      options:
+        - Easy
+        - Medium
+        - Hard
+        - Not sure
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: willing
+    attributes:
+      label: Contribution
+      options:
+        - label: I'd like to work on this (comment before opening a PR)
+          required: false

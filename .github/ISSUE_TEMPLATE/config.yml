@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Contributing guide
+    url: https://github.com/notsoocool/worktowords/blob/main/CONTRIBUTING.md
+    about: Setup, PR checklist, and code conventions
+  - name: README & environment setup
+    url: https://github.com/notsoocool/worktowords/blob/main/README.md
+    about: Tech stack, env vars, and database schema
