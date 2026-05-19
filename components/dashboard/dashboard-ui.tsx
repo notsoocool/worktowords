@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Loader2, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
@@ -9,7 +10,7 @@ import { DashboardOutputSkeleton } from "@/components/dashboard/output-skeleton"
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Select,
   SelectContent,
@@ -22,12 +23,31 @@ import { toFriendlyBillingError } from "@/lib/billing-errors";
 
 type Mode = "help" | "auto";
 type Goal = "job" | "growth" | "authority";
+type Platform = "linkedin" | "instagram" | "youtube";
 
 type GenerateResponse = {
-  post: string;
   hashtags: string[];
   bestTime: string;
   suggestions: string[];
+  post?: string;
+  linkedin?: string;
+  instagram?: {
+    reelIdea?: string;
+    script?: string;
+    caption: string;
+    hashtags: string[];
+    bestTime: string;
+    suggestions: string[];
+  };
+  youtube?: {
+    title: string;
+    hook?: string;
+    script?: string;
+    description: string;
+    tags: string[];
+    chapterIdeas: string[];
+    suggestions: string[];
+  };
 };
 
 type UsageStatus = {
@@ -140,19 +160,160 @@ function buildLiveToastSteps({
   ];
 }
 
+function buildDraftWithHashtagsText(postText: string, hashtags: string[]) {
+  const tags = hashtags
+    .map((tag) => tag.trim())
+    .filter(Boolean)
+    .map((tag) => (tag.startsWith("#") ? tag : `#${tag}`));
+  if (tags.length === 0) return postText;
+  return `${postText}\n\n${tags.join(" ")}`;
+}
+
 export function DashboardUi() {
+  const searchParams = useSearchParams();
   const [text, setText] = React.useState("");
   const [mode, setMode] = React.useState<Mode>("help");
   const [goal, setGoal] = React.useState<Goal>("growth");
+  const [platforms, setPlatforms] = React.useState<Platform[]>(["linkedin"]);
   const [isGenerating, setIsGenerating] = React.useState(false);
   const [limitReachedOpen, setLimitReachedOpen] = React.useState(false);
   const [isRegenerating, setIsRegenerating] = React.useState<string | null>(
     null
   );
   const [result, setResult] = React.useState<GenerateResponse | null>(null);
+  const [linkedIn, setLinkedIn] = React.useState<string>("");
+  const [instagram, setInstagram] = React.useState<GenerateResponse["instagram"] | null>(null);
+  const [youtube, setYouTube] = React.useState<GenerateResponse["youtube"] | null>(null);
+  const [platformLoading, setPlatformLoading] = React.useState<
+    Partial<Record<Platform, boolean>>
+  >({});
   const [draft, setDraft] = React.useState<string>("");
+  const [lastUserInput, setLastUserInput] = React.useState<string>("");
+  const [outputTab, setOutputTab] = React.useState<Platform>("linkedin");
   const [usage, setUsage] = React.useState<UsageStatus | null>(null);
   const [isUpgrading, setIsUpgrading] = React.useState(false);
+
+  React.useEffect(() => {
+    const postId = searchParams.get("post");
+    if (!postId) return;
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const res = await fetch(`/api/posts/${encodeURIComponent(postId)}`, {
+          method: "GET",
+        });
+        const data = (await res.json().catch(() => null)) as
+          | {
+              post?: {
+                id: string | number;
+                content: string;
+                hashtags: string[];
+                goal: Goal;
+                type?: "single" | "multi";
+                linkedin?: string | null;
+                instagram?:
+                  | { reelIdea: string; caption: string; script: string }
+                  | null;
+                youtube?: { title: string; hook: string; script: string } | null;
+                created_at: string;
+              };
+              error?: string;
+            }
+          | null;
+
+        if (!res.ok) throw new Error(data?.error || "Failed to load history item.");
+        const post = data?.post;
+        if (!post) throw new Error("History item not found.");
+        if (cancelled) return;
+
+        const nextPlatforms: Platform[] = [];
+        if (post.linkedin && post.linkedin.trim()) nextPlatforms.push("linkedin");
+        if (post.instagram) nextPlatforms.push("instagram");
+        if (post.youtube) nextPlatforms.push("youtube");
+        const ensuredPlatforms = nextPlatforms.length ? nextPlatforms : (["linkedin"] as Platform[]);
+
+        const linkedInText = post.linkedin ?? post.content ?? "";
+
+        setText(post.content ?? "");
+        setLastUserInput(post.content ?? "");
+        setPlatforms(ensuredPlatforms);
+        setGoal(
+          post.goal === "job" || post.goal === "growth" || post.goal === "authority"
+            ? post.goal
+            : "growth"
+        );
+
+        setResult({
+          hashtags: Array.isArray(post.hashtags) ? post.hashtags : [],
+          bestTime: "",
+          suggestions: [],
+          post: post.content,
+          linkedin: post.linkedin ?? undefined,
+          instagram: post.instagram
+            ? {
+                caption: post.instagram.caption,
+                hashtags: [],
+                bestTime: "",
+                suggestions: post.instagram.reelIdea ? [post.instagram.reelIdea] : [],
+                reelIdea: post.instagram.reelIdea,
+                script: post.instagram.script,
+              }
+            : undefined,
+          youtube: post.youtube
+            ? {
+                title: post.youtube.title,
+                description: post.youtube.script,
+                tags: [],
+                chapterIdeas: post.youtube.hook ? [post.youtube.hook] : [],
+                suggestions: [],
+                hook: post.youtube.hook,
+                script: post.youtube.script,
+              }
+            : undefined,
+        });
+
+        setLinkedIn(linkedInText);
+        setDraft(buildDraftWithHashtagsText(linkedInText, post.hashtags ?? []));
+        setInstagram(
+          post.instagram
+            ? {
+                caption: post.instagram.caption,
+                hashtags: [],
+                bestTime: "",
+                suggestions: post.instagram.reelIdea ? [post.instagram.reelIdea] : [],
+                reelIdea: post.instagram.reelIdea,
+                script: post.instagram.script,
+              }
+            : null
+        );
+        setYouTube(
+          post.youtube
+            ? {
+                title: post.youtube.title,
+                description: post.youtube.script,
+                tags: [],
+                chapterIdeas: post.youtube.hook ? [post.youtube.hook] : [],
+                suggestions: [],
+                hook: post.youtube.hook,
+                script: post.youtube.script,
+              }
+            : null
+        );
+
+        setOutputTab(ensuredPlatforms[0] ?? "linkedin");
+        toast.success("Loaded from history.");
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : "Failed to load history item.";
+        toast.error(msg);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [searchParams]);
 
   const fetchUsage = React.useCallback(async () => {
     try {
@@ -213,6 +374,12 @@ export function DashboardUi() {
     }
 
     setIsGenerating(true);
+    setPlatformLoading(
+      platforms.reduce<Partial<Record<Platform, boolean>>>((acc, p) => {
+        acc[p] = true;
+        return acc;
+      }, {})
+    );
     const id = toast.loading(toastLabel);
     const liveSteps = buildLiveToastSteps({ input: userInput, mode, goal });
     let stepIndex = 0;
@@ -234,6 +401,7 @@ export function DashboardUi() {
           userInput,
           mode: mode === "help" ? "help" : "write",
           goal,
+          platforms,
         }),
       });
 
@@ -262,7 +430,6 @@ export function DashboardUi() {
 
       if (
         !data ||
-        typeof (data as GenerateResponse).post !== "string" ||
         !Array.isArray((data as GenerateResponse).hashtags) ||
         typeof (data as GenerateResponse).bestTime !== "string" ||
         !Array.isArray((data as GenerateResponse).suggestions)
@@ -271,8 +438,13 @@ export function DashboardUi() {
       }
 
       const next = data as GenerateResponse;
+      setLastUserInput(userInput);
       setResult(next);
-      setDraft(next.post);
+      const linkedInText = next.linkedin ?? next.post ?? "";
+      setLinkedIn(linkedInText);
+      setInstagram(next.instagram ?? null);
+      setYouTube(next.youtube ?? null);
+      setDraft(buildDraftWithHashtagsText(linkedInText, next.hashtags));
       void fetchUsage();
       toast.success("Post generated.", { id });
     } catch (e) {
@@ -281,6 +453,7 @@ export function DashboardUi() {
       toast.error(message, { id });
     } finally {
       window.clearInterval(liveTicker);
+      setPlatformLoading({});
       setIsGenerating(false);
     }
   }
@@ -289,6 +462,128 @@ export function DashboardUi() {
     return callGenerate({
       userInput: text.trim(),
       toastLabel: "Generating your post…",
+    });
+  }
+
+  async function regeneratePlatform(platform: Platform) {
+    const baseInput = (lastUserInput || text).trim();
+    if (!baseInput) {
+      toast.info("Add a few bullet points first.");
+      return;
+    }
+    if (isGenerating || isRegenerating || limitReachedOpen) return;
+
+    setOutputTab(platform);
+    setIsGenerating(true);
+    setPlatformLoading({ [platform]: true });
+    const id = toast.loading(`Regenerating ${platform}…`);
+
+    try {
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userInput: baseInput,
+          mode: mode === "help" ? "help" : "write",
+          goal,
+          platforms: [platform],
+        }),
+      });
+
+      const data = (await res.json().catch(() => null)) as
+        | GenerateResponse
+        | { error?: string; message?: string; raw?: string }
+        | null;
+
+      if (!res.ok) {
+        if (
+          data &&
+          typeof data === "object" &&
+          "error" in data &&
+          data.error === "LIMIT_REACHED"
+        ) {
+          setLimitReachedOpen(true);
+          void fetchUsage();
+          toast.error("Daily limit reached.", { id });
+          return;
+        }
+        const msg =
+          (data && "error" in data && typeof data.error === "string" && data.error) ||
+          "Failed to regenerate. Please try again.";
+        throw new Error(msg);
+      }
+
+      if (
+        !data ||
+        !Array.isArray((data as GenerateResponse).hashtags) ||
+        typeof (data as GenerateResponse).bestTime !== "string" ||
+        !Array.isArray((data as GenerateResponse).suggestions)
+      ) {
+        throw new Error("Unexpected response format from the server.");
+      }
+
+      const next = data as GenerateResponse;
+      setLastUserInput(baseInput);
+
+      setResult((prev) => {
+        const base =
+          prev ??
+          ({
+            hashtags: [],
+            bestTime: "",
+            suggestions: [],
+          } satisfies GenerateResponse);
+
+        if (platform === "linkedin") {
+          return {
+            ...base,
+            hashtags: next.hashtags,
+            bestTime: next.bestTime,
+            suggestions: next.suggestions,
+            post: next.post ?? base.post,
+            linkedin: next.linkedin ?? next.post ?? base.linkedin,
+          };
+        }
+
+        if (platform === "instagram") {
+          return {
+            ...base,
+            instagram: next.instagram ?? base.instagram,
+          };
+        }
+
+        return {
+          ...base,
+          youtube: next.youtube ?? base.youtube,
+        };
+      });
+
+      if (platform === "linkedin") {
+        const linkedInText = next.linkedin ?? next.post ?? "";
+        setLinkedIn(linkedInText);
+        setDraft(buildDraftWithHashtagsText(linkedInText, next.hashtags));
+      } else if (platform === "instagram") {
+        setInstagram(next.instagram ?? null);
+      } else {
+        setYouTube(next.youtube ?? null);
+      }
+
+      void fetchUsage();
+      toast.success("Regenerated.", { id });
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "Something went wrong. Try again.";
+      toast.error(message, { id });
+    } finally {
+      setPlatformLoading({});
+      setIsGenerating(false);
+    }
+  }
+
+  function togglePlatform(next: Platform, checked: boolean) {
+    setPlatforms((prev) => {
+      const has = prev.includes(next);
+      const updated = checked ? (has ? prev : [...prev, next]) : prev.filter((p) => p !== next);
+      return updated.length === 0 ? ["linkedin"] : updated;
     });
   }
 
@@ -326,6 +621,19 @@ export function DashboardUi() {
     try {
       await navigator.clipboard.writeText(draft);
       toast.success("Copied to clipboard.");
+    } catch {
+      toast.error("Copy failed. Please copy manually.");
+    }
+  }
+
+  async function copyText(label: string, value: string) {
+    if (!value.trim()) {
+      toast.info("Nothing to copy yet.");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(value);
+      toast.success(`${label} copied.`);
     } catch {
       toast.error("Copy failed. Please copy manually.");
     }
@@ -528,7 +836,43 @@ export function DashboardUi() {
             </div>
           </div>
 
-          <div className="flex justify-end">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+            <div className="grid gap-2">
+              <Label className="text-sm font-semibold">Select Platforms</Label>
+              <div className="flex flex-wrap gap-3">
+                <label className="inline-flex items-center gap-2 rounded-xl border bg-background px-3 py-2 text-sm">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 accent-primary"
+                    checked={platforms.includes("linkedin")}
+                    onChange={(e) => togglePlatform("linkedin", e.target.checked)}
+                  />
+                  LinkedIn
+                </label>
+                <label className="inline-flex items-center gap-2 rounded-xl border bg-background px-3 py-2 text-sm">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 accent-primary"
+                    checked={platforms.includes("instagram")}
+                    onChange={(e) => togglePlatform("instagram", e.target.checked)}
+                  />
+                  Instagram
+                </label>
+                <label className="inline-flex items-center gap-2 rounded-xl border bg-background px-3 py-2 text-sm">
+                  <input
+                    type="checkbox"
+                    className="h-4 w-4 accent-primary"
+                    checked={platforms.includes("youtube")}
+                    onChange={(e) => togglePlatform("youtube", e.target.checked)}
+                  />
+                  YouTube
+                </label>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                LinkedIn is always included if none are selected.
+              </p>
+            </div>
+
             <div className="flex flex-col items-end gap-2">
               {usage ? (
                 <p className="text-xs text-muted-foreground">
@@ -581,12 +925,17 @@ export function DashboardUi() {
               </p>
             </div>
           ) : null}
-          <div className={cn("saas-card p-6 sm:p-8", isGenerating && "pointer-events-none opacity-60")}>
+          <div
+            className={cn(
+              "saas-card p-6 sm:p-8",
+              isGenerating && "pointer-events-none opacity-60"
+            )}
+          >
             <div className="flex items-start justify-between gap-3">
               <div className="grid gap-1">
-                <p className="text-base font-semibold">Generated post</p>
+                <p className="text-base font-semibold">Generated content</p>
                 <p className="text-xs text-muted-foreground">
-                  Edit it before posting.
+                  Switch platforms using tabs below.
                 </p>
               </div>
               <Button
@@ -599,54 +948,257 @@ export function DashboardUi() {
               </Button>
             </div>
 
-            <div className="mt-4">
-              <Textarea
-                value={draft}
-                onChange={(e) => setDraft(e.target.value)}
-                className="min-h-72"
-              />
-            </div>
+            {(() => {
+              const tabs = (["linkedin", "instagram", "youtube"] as Platform[]).filter((p) => {
+                if (p === "linkedin") return Boolean((result.linkedin ?? result.post ?? linkedIn).trim());
+                if (p === "instagram") return Boolean(result.instagram ?? instagram);
+                if (p === "youtube") return Boolean(result.youtube ?? youtube);
+                return false;
+              });
+              const tabDefault = (tabs[0] ?? "linkedin") as Platform;
+              return (
+                <Tabs
+                  value={tabs.includes(outputTab) ? outputTab : tabDefault}
+                  onValueChange={(v) => setOutputTab(v as Platform)}
+                  className="mt-4"
+                >
+                  <TabsList className="grid h-10 w-full grid-cols-3 rounded-xl border bg-muted p-1">
+                    {tabs.includes("linkedin") ? (
+                      <TabsTrigger value="linkedin" className="h-8 rounded-lg text-sm">
+                        LinkedIn
+                      </TabsTrigger>
+                    ) : null}
+                    {tabs.includes("instagram") ? (
+                      <TabsTrigger value="instagram" className="h-8 rounded-lg text-sm">
+                        Instagram
+                      </TabsTrigger>
+                    ) : null}
+                    {tabs.includes("youtube") ? (
+                      <TabsTrigger value="youtube" className="h-8 rounded-lg text-sm">
+                        YouTube
+                      </TabsTrigger>
+                    ) : null}
+                  </TabsList>
 
-            <div className="mt-4 flex flex-wrap gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={isGenerating || !!isRegenerating}
-                onClick={() => onRegenerate("Rewrite this post to be shorter.")}
-              >
-                Make it shorter
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={isGenerating || !!isRegenerating}
-                onClick={() => onRegenerate("Rewrite this post to be more casual.")}
-              >
-                More casual
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={isGenerating || !!isRegenerating}
-                onClick={() => onRegenerate("Rewrite this post to be more technical.")}
-              >
-                More technical
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={isGenerating || !!isRegenerating}
-                onClick={() =>
-                  onRegenerate("Rewrite this post to add more storytelling.")
-                }
-              >
-                Add storytelling
-              </Button>
-            </div>
+                  <TabsContent value="linkedin" className="mt-4">
+                    <div className="grid gap-2">
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-xs text-muted-foreground">Editable</p>
+                        <div className="flex items-center gap-2">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="rounded-lg"
+                            onClick={() => void copyText("LinkedIn post", draft)}
+                          >
+                            Copy
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="rounded-lg"
+                            disabled={isGenerating || !!isRegenerating}
+                            onClick={() => void regeneratePlatform("linkedin")}
+                          >
+                            Regenerate
+                          </Button>
+                        </div>
+                      </div>
+                      <Textarea
+                        value={draft}
+                        onChange={(e) => setDraft(e.target.value)}
+                        className="min-h-72"
+                      />
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={isGenerating || !!isRegenerating}
+                          onClick={() => onRegenerate("Rewrite this post to be shorter.")}
+                        >
+                          Make it shorter
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={isGenerating || !!isRegenerating}
+                          onClick={() => onRegenerate("Rewrite this post to be more casual.")}
+                        >
+                          More casual
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={isGenerating || !!isRegenerating}
+                          onClick={() => onRegenerate("Rewrite this post to be more technical.")}
+                        >
+                          More technical
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          disabled={isGenerating || !!isRegenerating}
+                          onClick={() =>
+                            onRegenerate("Rewrite this post to add more storytelling.")
+                          }
+                        >
+                          Add storytelling
+                        </Button>
+                      </div>
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="instagram" className="mt-4">
+                    {platformLoading.instagram ? (
+                      <p className="text-sm text-muted-foreground">Generating Instagram…</p>
+                    ) : instagram ? (
+                      <div className="grid gap-4">
+                        <div className="rounded-2xl border bg-background p-4">
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="text-xs font-medium text-muted-foreground">
+                              Reel Idea
+                            </p>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="rounded-lg"
+                              disabled={isGenerating || !!isRegenerating}
+                              onClick={() => void regeneratePlatform("instagram")}
+                            >
+                              Regenerate
+                            </Button>
+                          </div>
+                          <p className="mt-2 text-sm leading-6 text-foreground/90 whitespace-pre-wrap">
+                            {(instagram.reelIdea as string | undefined) ??
+                              instagram.suggestions[0] ??
+                              "Hook the viewer with a concrete outcome, then show the steps."}
+                          </p>
+                        </div>
+                        <div className="rounded-2xl border bg-background p-4">
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="text-xs font-medium text-muted-foreground">Script</p>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="rounded-lg"
+                              onClick={() =>
+                                void copyText(
+                                  "Instagram script",
+                                  (instagram.script as string | undefined) ?? instagram.caption
+                                )
+                              }
+                            >
+                              Copy script
+                            </Button>
+                          </div>
+                          <p className="mt-2 text-sm leading-6 text-foreground/90 whitespace-pre-wrap">
+                            {(instagram.script as string | undefined) ?? instagram.caption}
+                          </p>
+                        </div>
+                        <div className="rounded-2xl border bg-background p-4">
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="text-xs font-medium text-muted-foreground">Caption</p>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="rounded-lg"
+                              onClick={() => void copyText("Instagram caption", instagram.caption)}
+                            >
+                              Copy caption
+                            </Button>
+                          </div>
+                          <p className="mt-2 text-sm leading-6 text-foreground/90 whitespace-pre-wrap">
+                            {instagram.caption}
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No Instagram output.</p>
+                    )}
+                  </TabsContent>
+
+                  <TabsContent value="youtube" className="mt-4">
+                    {platformLoading.youtube ? (
+                      <p className="text-sm text-muted-foreground">Generating YouTube…</p>
+                    ) : youtube ? (
+                      <div className="grid gap-4">
+                        <div className="rounded-2xl border bg-background p-4">
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="text-xs font-medium text-muted-foreground">Title</p>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="rounded-lg"
+                              onClick={() => void copyText("YouTube title", youtube.title)}
+                            >
+                              Copy title
+                            </Button>
+                          </div>
+                          <p className="mt-2 text-sm leading-6 text-foreground/90">
+                            {youtube.title}
+                          </p>
+                        </div>
+                        <div className="rounded-2xl border bg-background p-4">
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="text-xs font-medium text-muted-foreground">Hook</p>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="rounded-lg"
+                              disabled={isGenerating || !!isRegenerating}
+                              onClick={() => void regeneratePlatform("youtube")}
+                            >
+                              Regenerate
+                            </Button>
+                          </div>
+                          <p className="mt-2 text-sm leading-6 text-foreground/90 whitespace-pre-wrap">
+                            {(youtube.hook as string | undefined) ??
+                              youtube.chapterIdeas[0] ??
+                              youtube.suggestions[0] ??
+                              "Open with the strongest payoff in the first 10 seconds."}
+                          </p>
+                        </div>
+                        <div className="rounded-2xl border bg-background p-4">
+                          <div className="flex items-center justify-between gap-3">
+                            <p className="text-xs font-medium text-muted-foreground">Script</p>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="rounded-lg"
+                              onClick={() =>
+                                void copyText(
+                                  "YouTube script",
+                                  (youtube.script as string | undefined) ?? youtube.description
+                                )
+                              }
+                            >
+                              Copy script
+                            </Button>
+                          </div>
+                          <p className="mt-2 text-sm leading-6 text-foreground/90 whitespace-pre-wrap">
+                            {(youtube.script as string | undefined) ?? youtube.description}
+                          </p>
+                        </div>
+                      </div>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">No YouTube output.</p>
+                    )}
+                  </TabsContent>
+                </Tabs>
+              );
+            })()}
           </div>
 
           <aside

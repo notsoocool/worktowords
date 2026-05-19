@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Library } from "lucide-react";
 import { toast } from "sonner";
 
@@ -41,6 +42,7 @@ function goalBadgeClass(goal: Goal) {
 }
 
 export function HistoryContent() {
+  const router = useRouter();
   const [filter, setFilter] = React.useState<GoalFilter>("all");
   const [history, setHistory] = React.useState<HistoryPost[]>([]);
   const [loading, setLoading] = React.useState(true);
@@ -202,7 +204,16 @@ export function HistoryContent() {
                   {post.hashtags.map((t) => (t.startsWith("#") ? t : `#${t}`)).join(" ")}
                 </p>
               ) : null}
-              <div className="mt-4 flex justify-end border-t border-border/50 pt-3">
+              <div className="mt-4 flex items-center justify-end gap-2 border-t border-border/50 pt-3">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="rounded-lg"
+                  onClick={() => router.push(`/dashboard?post=${post.id}`)}
+                >
+                  Open
+                </Button>
                 <Button
                   type="button"
                   variant="outline"

@@ -4,8 +4,22 @@ create table if not exists public.posts (
   content text not null,
   hashtags text[] not null default '{}',
   goal text not null default 'growth' check (goal in ('job', 'growth', 'authority')),
+  type text not null default 'single',
+  linkedin text,
+  instagram jsonb,
+  youtube jsonb,
   created_at timestamptz not null default now()
 );
+
+-- Backward-compatible column additions for existing databases.
+alter table if exists public.posts
+  add column if not exists type text not null default 'single';
+alter table if exists public.posts
+  add column if not exists linkedin text;
+alter table if exists public.posts
+  add column if not exists instagram jsonb;
+alter table if exists public.posts
+  add column if not exists youtube jsonb;
 
 create index if not exists posts_user_id_created_at_idx
   on public.posts (user_id, created_at desc);
