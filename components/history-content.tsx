@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Library } from "lucide-react";
+import { Library, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { HistorySkeletonList } from "@/components/history/history-skeleton";
@@ -46,6 +46,7 @@ export function HistoryContent() {
   const [filter, setFilter] = React.useState<GoalFilter>("all");
   const [history, setHistory] = React.useState<HistoryPost[]>([]);
   const [loading, setLoading] = React.useState(true);
+  const [deletingPostId, setDeletingPostId] = React.useState<string | null>(null);
 
   const fetchHistory = React.useCallback(async () => {
     setLoading(true);
@@ -85,6 +86,32 @@ export function HistoryContent() {
       toast.success("Copied to clipboard.");
     } catch {
       toast.error("Copy failed.");
+    }
+  }
+
+  async function deletePost(post: HistoryPost) {
+    const postId = String(post.id);
+    const confirmed = window.confirm("Delete this saved post? This cannot be undone.");
+    if (!confirmed) return;
+
+    setDeletingPostId(postId);
+    try {
+      const res = await fetch(`/api/posts/${encodeURIComponent(postId)}`, {
+        method: "DELETE",
+      });
+      const data = (await res.json().catch(() => null)) as
+        | { error?: string }
+        | null;
+
+      if (!res.ok) throw new Error(data?.error || "Failed to delete post.");
+
+      setHistory((items) => items.filter((item) => String(item.id) !== postId));
+      toast.success("Post deleted from history.");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to delete post.";
+      toast.error(msg);
+    } finally {
+      setDeletingPostId(null);
     }
   }
 
@@ -205,6 +232,18 @@ export function HistoryContent() {
                 </p>
               ) : null}
               <div className="mt-4 flex items-center justify-end gap-2 border-t border-border/50 pt-3">
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  className="mr-auto rounded-lg"
+                  onClick={() => void deletePost(post)}
+                  disabled={deletingPostId === String(post.id)}
+                  aria-label="Delete saved post"
+                >
+                  <Trash2 className="size-3.5" aria-hidden />
+                  {deletingPostId === String(post.id) ? "Deleting..." : "Delete"}
+                </Button>
                 <Button
                   type="button"
                   variant="ghost"
