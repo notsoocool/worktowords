@@ -16,11 +16,11 @@ export async function POST(req: Request) {
     }
 
     const options = {
-      amount: 14900, // ₹149 in paise
+      amount: 14900,
       currency: "INR",
       receipt: `rcpt_${userId.substring(0, 8)}_${Date.now()}`,
       notes: {
-        userId: userId, // Crucial for identifying the user in the webhook payload
+        userId: userId,
       },
     };
 
