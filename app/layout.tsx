@@ -7,6 +7,7 @@ import { ClerkProviderWrapper } from "@/app/clerk-provider";
 import { AppToaster } from "@/components/app-toaster";
 import { AppThemeProvider } from "@/app/theme-provider";
 import { ThemeRippleToggle } from "@/components/theme-ripple-toggle";
+import { ScrollToTop } from "@/components/scroll-to-top";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -45,6 +46,7 @@ export default function RootLayout({
             <Footer />
             <AppToaster />
             <ThemeRippleToggle />
+            <ScrollToTop />
           </ClerkProviderWrapper>
         </AppThemeProvider>
       </body>
