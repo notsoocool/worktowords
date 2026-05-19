@@ -1,11 +1,6 @@
 import { NextResponse } from "next/server";
 import crypto from "crypto";
-import { createClient } from "@supabase/supabase-js";
-
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY! 
-);
+import { processProUpgrade } from "@/lib/paymentService"; 
 
 export async function POST(req: Request) {
   try {
@@ -39,39 +34,13 @@ export async function POST(req: Request) {
         return new NextResponse("Missing userId in payment notes", { status: 400 });
       }
 
-      const planExpiryDate = new Date();
-      planExpiryDate.setDate(planExpiryDate.getDate() + 30);
-      const expiryIsoString = planExpiryDate.toISOString();
-
-      const { error: subError } = await supabaseAdmin
-        .from("user_subscriptions")
-        .upsert(
-          {
-            user_id: userId,
-            payment_id: paymentId,
-            razorpay_order_id: orderId,
-            plan: "pro",
-            plan_status: "active",
-            plan_expiry: expiryIsoString,
-            amount_paise: payment.amount,
-            currency: payment.currency,
-            updated_at: new Date().toISOString(),
-          },
-          { onConflict: "razorpay_order_id" }
-        );
-
-      if (subError) throw subError;
-
-      const { error: usageError } = await supabaseAdmin
-        .from("user_usage")
-        .update({
-          plan: "pro",
-          plan_expiry: expiryIsoString,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("user_id", userId);
-
-      if (usageError) throw usageError;
+      await processProUpgrade(
+        userId, 
+        paymentId, 
+        orderId, 
+        payment.amount, 
+        payment.currency
+      );
     }
 
     return NextResponse.json({ received: true }, { status: 200 });
