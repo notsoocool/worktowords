@@ -268,3 +268,26 @@ export async function getPostById(
   throw new Error("Failed to load post.");
 }
 
+export async function deletePostById(
+  userId: string,
+  postId: string
+): Promise<boolean> {
+  const { createSupabaseServerClient } = await import("@/lib/supabase-server");
+  const supabase = createSupabaseServerClient();
+  if (!supabase) {
+    throw new Error(
+      "Missing Supabase configuration (NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY)."
+    );
+  }
+
+  const { data, error } = await supabase
+    .from("posts")
+    .delete()
+    .eq("user_id", userId)
+    .eq("id", postId)
+    .select("id")
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  return Boolean(data);
+}
