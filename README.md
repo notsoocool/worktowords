@@ -19,6 +19,28 @@ Turn your daily work into **social-ready content** — LinkedIn posts, Instagram
 - 🔔 **Live toasts** during generation
 - 🌓 **Light / dark** theme
 
+## 📸 Screenshots
+
+### 🏠 Landing Page
+![Landing page](docs/screenshots/home.png)
+*Describe what you built — AI turns it into high-quality content for every platform.*
+
+### ⚙️ How It Works & Output Demo
+![How it works](docs/screenshots/how-it-works.png)
+*Three steps: write your work, AI structures it, get LinkedIn, Instagram & YouTube drafts instantly.*
+
+### ✍️ Dashboard — Writing Interface
+![Dashboard](docs/screenshots/dashboard.png)
+*Pick your goal, mode, and platforms — then hit Generate Post.*
+
+### 🚀 Sample Generated Post
+![Generated post](docs/screenshots/generate.png)
+*One input generates platform-ready drafts for LinkedIn, Instagram, and YouTube simultaneously.*
+
+### 💳 Pricing
+![Pricing](docs/screenshots/pricing.png)
+*Free plan with 5 generations/day. Pro at ₹149/month for up to 100 generations via UPI.*
+
 ## 🧰 Tech Stack
 
 - **Next.js 16** (App Router) + **TypeScript**
