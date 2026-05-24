@@ -27,8 +27,8 @@ export function Footer() {
   return (
     <footer className="mt-auto w-full border-t border-border/60 bg-muted/30">
       <div className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 gap-10 md:grid-cols-2 lg:grid-cols-4 lg:gap-8">
-          <div className="flex flex-col gap-3">
+        <div className="grid grid-cols-1 gap-10 border-b border-border/60 pb-10 md:grid-cols-2 lg:grid-cols-[minmax(0,1.3fr)_repeat(3,minmax(0,1fr))] lg:gap-8">
+          <div className="flex max-w-md flex-col gap-4">
             <BrandLogoLink
               href="/"
               size={40}
@@ -40,6 +40,17 @@ export function Footer() {
             <p className="max-w-sm text-sm leading-relaxed text-muted-foreground">
               Turn your daily work into high-quality LinkedIn posts using AI.
             </p>
+            <div className="flex flex-wrap gap-3 pt-1">
+              <Link href="/dashboard" className={linkClass}>
+                Open Dashboard
+              </Link>
+              <Link href="/#pricing" className={linkClass}>
+                Pricing
+              </Link>
+              <Link href="/about" className={linkClass}>
+                About
+              </Link>
+            </div>
           </div>
 
           <FooterColumn title="Product">
@@ -52,9 +63,15 @@ export function Footer() {
             <Link href="/settings" className={linkClass}>
               Settings
             </Link>
+            <Link href="/#pricing" className={linkClass}>
+              Pricing
+            </Link>
           </FooterColumn>
 
-          <FooterColumn title="Company">
+          <FooterColumn title="Resources">
+            <Link href="/" className={linkClass}>
+              Home
+            </Link>
             <Link href="/about" className={linkClass}>
               About
             </Link>
@@ -63,6 +80,14 @@ export function Footer() {
               className={linkClass}
             >
               Contact
+            </a>
+            <a
+              href="https://github.com/notsoocool/worktowords"
+              className={linkClass}
+              target="_blank"
+              rel="noreferrer"
+            >
+              GitHub
             </a>
           </FooterColumn>
 
@@ -76,7 +101,7 @@ export function Footer() {
           </FooterColumn>
         </div>
 
-        <div className="mt-12 border-t border-border/60 pt-8">
+        <div className="pt-8">
           <p className="text-center text-xs text-muted-foreground sm:text-left">
             © 2026 WorktoWords. All rights reserved.
           </p>
