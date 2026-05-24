@@ -29,6 +29,17 @@ import {
 const GENERATE_LIMIT = 12;
 const GENERATE_WINDOW_MS = 60_000;
 
+function isTransientUsageCheckError(message: string) {
+  const normalized = message.trim().toLowerCase();
+  return (
+    normalized.includes("fetch failed") ||
+    normalized.includes("network") ||
+    normalized.includes("econnreset") ||
+    normalized.includes("etimedout") ||
+    normalized.includes("timeout")
+  );
+}
+
 function toCanonicalHashtags(tags: string[]) {
   const seen = new Set<string>();
   const out: string[] = [];
@@ -202,10 +213,14 @@ export async function postGenerate(req: Request) {
     }
   } catch (e) {
     const message = e instanceof Error ? e.message : "Usage limit check failed.";
-    return Response.json(
-      { error: `Usage limit check failed: ${message}` },
-      { status: 500, headers: { "x-request-id": requestId } }
-    );
+    if (!isTransientUsageCheckError(message)) {
+      return Response.json(
+        { error: `Usage limit check failed: ${message}` },
+        { status: 500, headers: { "x-request-id": requestId } }
+      );
+    }
+
+    logSecurityWarn("usage_check_degraded", ctx, { message });
   }
 
   const settings = await getUserSettingsForGeneration(userId);
@@ -264,4 +279,3 @@ export async function postGenerate(req: Request) {
   });
   return Response.json(result, { headers: { "x-request-id": requestId } });
 }
-
