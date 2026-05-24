@@ -2,7 +2,7 @@ import { BrandLogoLink } from "@/components/brand-logo";
 import { AppNavbarLinks } from "@/components/app-navbar";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { Show, SignInButton, UserButton } from "@clerk/nextjs";
+import { Show, SignInButton, SignUpButton, UserButton } from "@clerk/nextjs";
 
 export function Navbar({ className }: { className?: string }) {
   const hasClerkKey =
@@ -35,17 +35,29 @@ export function Navbar({ className }: { className?: string }) {
 
         <div className="flex shrink-0 items-center gap-2 sm:gap-3">
           {!hasClerkKey ? (
-            <Button variant="outline" size="sm" disabled>
-              Sign In
-            </Button>
+            <>
+              <Button variant="outline" size="sm" disabled>
+                Sign In
+              </Button>
+              <Button size="sm" className="rounded-xl" disabled>
+                Get Started
+              </Button>
+            </>
           ) : (
             <>
               <Show when="signed-out">
-                <SignInButton mode="modal">
-                  <Button variant="outline" size="sm" className="rounded-xl">
-                    Sign In
-                  </Button>
-                </SignInButton>
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <SignInButton mode="modal">
+                    <Button variant="outline" size="sm" className="rounded-xl">
+                      Sign In
+                    </Button>
+                  </SignInButton>
+                  <SignUpButton mode="modal">
+                    <Button size="sm" className="rounded-xl">
+                      Get Started
+                    </Button>
+                  </SignUpButton>
+                </div>
               </Show>
               <Show when="signed-in">
                 <UserButton />
