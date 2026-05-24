@@ -57,7 +57,7 @@ export function PricingSection() {
     isLoaded && isSignedIn && !loading && plan === "pro";
 
   return (
-    <section className="mx-auto w-full max-w-6xl px-4 pb-8 sm:px-6">
+    <section id="pricing" className="mx-auto w-full max-w-6xl scroll-mt-24 px-4 pb-8 sm:px-6">
       <div className="saas-card p-6 sm:p-8">
         <div className="mb-6 flex items-center justify-between">
           <div>
