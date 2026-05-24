@@ -1,8 +1,10 @@
 "use client";
 
 import * as React from "react";
+import { useUser } from "@clerk/nextjs";
 import { toast } from "sonner";
 
+import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -16,10 +18,12 @@ type Goal = "job" | "growth" | "authority";
 type Tone = "casual" | "professional" | "storytelling";
 
 export function SettingsForm() {
+  const { isLoaded: isUserLoaded, user } = useUser();
   const [defaultGoal, setDefaultGoal] = React.useState<Goal>("growth");
   const [tone, setTone] = React.useState<Tone>("professional");
   const [saving, setSaving] = React.useState(false);
   const [loaded, setLoaded] = React.useState(false);
+  const [deleting, setDeleting] = React.useState(false);
 
   React.useEffect(() => {
     let cancelled = false;
@@ -74,6 +78,33 @@ export function SettingsForm() {
     void save(defaultGoal, value);
   }
 
+  async function onDeleteAccount() {
+    if (!isUserLoaded || !user) return;
+
+    const confirmed = window.confirm(
+      "Delete your WorktoWords account and saved data? This cannot be undone."
+    );
+    if (!confirmed) return;
+
+    setDeleting(true);
+    try {
+      const res = await fetch("/api/account", { method: "DELETE" });
+      const data = (await res.json().catch(() => null)) as { error?: string } | null;
+
+      if (!res.ok) {
+        throw new Error(data?.error || "Failed to delete account data.");
+      }
+
+      await user.delete();
+      window.location.assign("/");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to delete account.";
+      toast.error(msg);
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
     <div className="saas-card p-6 sm:p-8">
       <div className="mb-3 flex items-center justify-between">
@@ -120,6 +151,30 @@ export function SettingsForm() {
             </SelectContent>
           </Select>
         </div>
+      </div>
+      <div className="mt-8 rounded-xl border border-destructive/20 bg-destructive/5 p-5">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="space-y-1.5">
+            <h2 className="text-sm font-semibold text-foreground">Delete account</h2>
+            <p className="text-sm text-muted-foreground">
+              Permanently removes your WorktoWords account access and clears saved
+              posts, settings, and usage records from this app.
+            </p>
+          </div>
+          <Button
+            variant="destructive"
+            disabled={!isUserLoaded || !user?.deleteSelfEnabled || deleting}
+            onClick={onDeleteAccount}
+          >
+            {deleting ? "Deleting…" : "Delete account"}
+          </Button>
+        </div>
+        {!user?.deleteSelfEnabled ? (
+          <p className="mt-3 text-xs text-muted-foreground">
+            Account self-deletion is currently unavailable for this session. Please
+            retry after re-authenticating if the button stays disabled.
+          </p>
+        ) : null}
       </div>
     </div>
   );
