@@ -175,3 +175,141 @@
   animation: none;
   mix-blend-mode: normal;
 }
+
+/* ==========================================================
+   Responsive Utilities
+   Append at the end of globals.css
+========================================================== */
+
+/* Small Laptops (≤ 992px) */
+@media (max-width: 992px) {
+  html {
+    font-size: 15px;
+  }
+
+  .container {
+    width: 95%;
+    margin-inline: auto;
+  }
+
+  .saas-card {
+    padding: 1.25rem;
+  }
+}
+
+/* Tablets (≤ 768px) */
+@media (max-width: 768px) {
+  html {
+    font-size: 14px;
+  }
+
+  body {
+    overflow-x: hidden;
+  }
+
+  .container {
+    width: 100%;
+    padding-inline: 1rem;
+    margin-inline: auto;
+  }
+
+  h1 {
+    font-size: clamp(1.75rem, 5vw, 2.25rem);
+    line-height: 1.2;
+  }
+
+  h2 {
+    font-size: clamp(1.5rem, 4vw, 1.875rem);
+  }
+
+  h3 {
+    font-size: 1.25rem;
+  }
+
+  .saas-card {
+    padding: 1rem;
+    border-radius: var(--radius-lg);
+  }
+
+  img,
+  video,
+  svg {
+    max-width: 100%;
+    height: auto;
+    display: block;
+  }
+
+  table {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  input,
+  textarea,
+  select,
+  button {
+    width: 100%;
+    max-width: 100%;
+  }
+}
+
+/* Mobile Devices (≤ 480px) */
+@media (max-width: 480px) {
+  html {
+    font-size: 13px;
+  }
+
+  body {
+    overflow-x: hidden;
+  }
+
+  .container {
+    width: 100%;
+    padding-inline: 0.75rem;
+  }
+
+  h1 {
+    font-size: 1.6rem;
+    line-height: 1.2;
+  }
+
+  h2 {
+    font-size: 1.35rem;
+  }
+
+  h3 {
+    font-size: 1.15rem;
+  }
+
+  p,
+  li {
+    line-height: 1.6;
+  }
+
+  .saas-card {
+    padding: 0.875rem;
+    border-radius: var(--radius-md);
+  }
+
+  img,
+  video,
+  svg {
+    max-width: 100%;
+    height: auto;
+  }
+
+  table {
+    display: block;
+    overflow-x: auto;
+  }
+
+  input,
+  textarea,
+  select,
+  button {
+    width: 100%;
+  }
+}
+
