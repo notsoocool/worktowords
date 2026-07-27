@@ -136,10 +136,10 @@ revoke execute on function public.check_and_increment_usage(text) from anon, aut
 
 grant usage on schema public to service_role;
 grant usage, select on all sequences in schema public to service_role;
-grant select, insert on table public.posts to service_role;
-grant select, insert, update on table public.user_settings to service_role;
-grant select, insert, update on table public.user_usage to service_role;
-grant select, insert, update on table public.user_subscriptions to service_role;
+grant select, insert, delete on table public.posts to service_role;
+grant select, insert, update, delete on table public.user_settings to service_role;
+grant select, insert, update, delete on table public.user_usage to service_role;
+grant select, insert, update, delete on table public.user_subscriptions to service_role;
 grant execute on function public.check_and_increment_usage(text) to service_role;
 
 alter table public.posts enable row level security;
@@ -176,4 +176,3 @@ create policy user_subscriptions_owner_rw
   with check (user_id = auth.uid()::text);
 
 alter function public.check_and_increment_usage(text) set search_path = public, pg_temp;
-

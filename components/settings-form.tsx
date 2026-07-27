@@ -19,6 +19,7 @@ export function SettingsForm() {
   const [defaultGoal, setDefaultGoal] = React.useState<Goal>("growth");
   const [tone, setTone] = React.useState<Tone>("professional");
   const [saving, setSaving] = React.useState(false);
+  const [deleting, setDeleting] = React.useState(false);
   const [loaded, setLoaded] = React.useState(false);
 
   React.useEffect(() => {
@@ -74,6 +75,28 @@ export function SettingsForm() {
     void save(defaultGoal, value);
   }
 
+  async function deleteAccount() {
+    if (
+      !window.confirm(
+        "Delete your account and all saved posts, settings, usage, and subscription data? This cannot be undone."
+      )
+    ) {
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      const res = await fetch("/api/account/delete", { method: "DELETE" });
+      const data = (await res.json().catch(() => null)) as { error?: string } | null;
+      if (!res.ok) throw new Error(data?.error || "Failed to delete account.");
+      window.location.assign("/");
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : "Failed to delete account.";
+      toast.error(msg);
+      setDeleting(false);
+    }
+  }
+
   return (
     <div className="saas-card p-6 sm:p-8">
       <div className="mb-3 flex items-center justify-between">
@@ -119,6 +142,24 @@ export function SettingsForm() {
               <SelectItem value="storytelling">storytelling</SelectItem>
             </SelectContent>
           </Select>
+        </div>
+      </div>
+      <div className="mt-8 border-t border-border/60 pt-6">
+        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
+          <div>
+            <h2 className="text-sm font-semibold text-destructive">Delete account</h2>
+            <p className="mt-1 max-w-xl text-sm text-muted-foreground">
+              Permanently remove your account and all saved WorktoWords data.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => void deleteAccount()}
+            disabled={deleting || saving}
+            className="inline-flex h-8 shrink-0 items-center justify-center rounded-lg border border-destructive/40 px-2.5 text-sm font-medium text-destructive transition-colors hover:bg-destructive/10 disabled:pointer-events-none disabled:opacity-50"
+          >
+            {deleting ? "Deleting…" : "Delete account"}
+          </button>
         </div>
       </div>
     </div>
